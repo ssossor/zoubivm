@@ -118,16 +118,18 @@ print("Ssor registered !")
 #
 #print(users)
 
-intents = discord.Intents.all()
-intents.message_content = True
+intents = discord.Intents.default()
+bot = commands.Bot(command_prefix='!', intents=intents)
 
-bot = commands.Bot(command_prefix='!', intents=discord.Intents.default())
-
-@bot.tree.command(name="clear", description="Supprime un nombre spécifié de messages")
-@discord.app_commands.describe(amount="Nombre de messages à supprimer (1-100, défaut: 10)")
-async def clear_command(interaction: discord.Interaction, amount: int = 10):
-    await clear_messages(interaction, amount)
-
+@bot.event
+async def on_ready():
+    print(f"✅ Bot connecté en tant que {bot.user}")
+    
+    try:
+        synced = await bot.tree.sync()
+        print(f"🔄 {len(synced)} commande(s) slash synchronisée(s)")
+    except Exception as e:
+        print(f"❌ Erreur lors de la synchronisation : {e}")
 
 @bot.tree.command(name="ping", description="test")
 async def ping(interaction: discord.Interaction):
@@ -165,5 +167,6 @@ async def profile(interaction: discord.Interaction, username: str):
 async def leaderboard(interaction: discord.Interaction):
     await interaction.response.send_message(embed=format_leaderboard())
 
-bot.run(config["token"])
-
+if __name__ == "__main__":
+    print("🚀 Démarrage du bot Root-Me...")
+    bot.run(config["DISCORD_TOKEN"])
