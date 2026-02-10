@@ -123,15 +123,15 @@ intents.message_content = True
 bot = discord.Client(intents=intents)
 tree = app_commands.CommandTree(bot)
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def slash(interaction: discord.Interaction, number: int, string: str):
     await interaction.response.send_message(f'{number=} {string=}', ephemeral=True)
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message("pong!")
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def register(interaction: discord.Interaction, username: str):
     r = do_register(username)
     if r["status"] == "error":
@@ -139,7 +139,7 @@ async def register(interaction: discord.Interaction, username: str):
     if r["status"] == "ok":
         await interaction.response.send_message(r["data"])
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def remove(interaction: discord.Interaction, username: str):
     r = do_remove(username)
     if r["status"] == "error":
@@ -147,11 +147,11 @@ async def remove(interaction: discord.Interaction, username: str):
     if r["status"] == "ok":
         await interaction.response.send_message(r["data"])
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def list(interaction: discord.Interaction):
     await interaction.response.send_message(do_list())
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def profile(interaction: discord.Interaction, username: str):
     r = do_profile(username)
     if r["status"] == "error":
@@ -159,9 +159,11 @@ async def profile(interaction: discord.Interaction, username: str):
     if r["status"] == "ok":
         await interaction.response.send_message(embed=format_profile(do_profile(username)["data"]))
 
-@tree.command(guild=discord.Object(id=1467201365754384425))
+@app_commands.command()
 async def leaderboard(interaction: discord.Interaction):
     await interaction.response.send_message(embed=format_leaderboard())
+
+tree.add_command(slash) # POUQOA CA MARCHE PAS
 
 bot.run(config["token"])
 
