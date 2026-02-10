@@ -1,4 +1,5 @@
 import requests, json, discord
+from discord.ext import commands
 from discord import app_commands
 from dotenv import dotenv_values
 
@@ -117,21 +118,22 @@ print("Ssor registered !")
 #
 #print(users)
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.message_content = True
 
-bot = discord.Client(intents=intents)
-tree = app_commands.CommandTree(bot)
+bot = commands.Bot(command_prefix='!', intents=discord.Intents.default())
 
-@app_commands.command()
-async def slash(interaction: discord.Interaction, number: int, string: str):
-    await interaction.response.send_message(f'{number=} {string=}', ephemeral=True)
+@bot.tree.command(name="clear", description="Supprime un nombre spécifié de messages")
+@discord.app_commands.describe(amount="Nombre de messages à supprimer (1-100, défaut: 10)")
+async def clear_command(interaction: discord.Interaction, amount: int = 10):
+    await clear_messages(interaction, amount)
 
-@app_commands.command()
+
+@bot.tree.command(name="ping", description="test")
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message("pong!")
 
-@app_commands.command()
+@bot.tree.command(name="register", description="test")
 async def register(interaction: discord.Interaction, username: str):
     r = do_register(username)
     if r["status"] == "error":
@@ -139,7 +141,7 @@ async def register(interaction: discord.Interaction, username: str):
     if r["status"] == "ok":
         await interaction.response.send_message(r["data"])
 
-@app_commands.command()
+@bot.tree.command(name="remove", description="test")
 async def remove(interaction: discord.Interaction, username: str):
     r = do_remove(username)
     if r["status"] == "error":
@@ -147,11 +149,11 @@ async def remove(interaction: discord.Interaction, username: str):
     if r["status"] == "ok":
         await interaction.response.send_message(r["data"])
 
-@app_commands.command()
+@bot.tree.command(name="list", description="test")
 async def list(interaction: discord.Interaction):
     await interaction.response.send_message(do_list())
 
-@app_commands.command()
+@bot.tree.command(name="profile", description="test")
 async def profile(interaction: discord.Interaction, username: str):
     r = do_profile(username)
     if r["status"] == "error":
@@ -159,11 +161,9 @@ async def profile(interaction: discord.Interaction, username: str):
     if r["status"] == "ok":
         await interaction.response.send_message(embed=format_profile(do_profile(username)["data"]))
 
-@app_commands.command()
+@bot.tree.command(name="leaderboard", description="test")
 async def leaderboard(interaction: discord.Interaction):
     await interaction.response.send_message(embed=format_leaderboard())
-
-tree.add_command(slash) # POUQOA CA MARCHE PAS
 
 bot.run(config["token"])
 
