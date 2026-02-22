@@ -1,6 +1,5 @@
 import requests, json, discord
-from discord.ext import commands
-from discord import app_commands
+from discord.ext import commands, tasks
 from dotenv import dotenv_values
 
 config = dotenv_values(".env")
@@ -12,8 +11,18 @@ creds = {"api_key": config["api_key"]}
 
 users = {}
 
+validated_challenges = []
+
+# Get all challenges / Marche pas ?
+def get_challenges() -> list:
+    r = requests.get(url + "challenges", cookies=creds)
+    if r.status_code == 200:
+        return {"status": "ok", "data": r.json()}
+    else:
+        return {"status": "error", "data": "ca marche pas"}
+
 # Get challenge from id
-def get_challenges(id_challenge: int) -> dict:
+def get_challenges_id(id_challenge: int) -> dict:
     r = requests.get(url + "challenges/" + str(id_challenge), cookies=creds)
     if r.status_code == 200:
         return {"status": "ok", "data": r.json()}
@@ -26,6 +35,7 @@ def get_auteurs(params: dict) -> list:
     if r.status_code == 200:
         return {"status": "ok", "data": r.json()}
     else:
+        print("aa", r.text)
         return {"status": "error", "data": "ca marche pas (Erreur auteur)"}
 
 # Get profile from id
@@ -49,6 +59,9 @@ def do_register(username):
         user_id = parse_users(r["data"], username)
         r2 = get_auteurs_id(user_id)
         if r2["status"] == "ok":
+            for i in r2["data"]["validations"]:
+                if int(i["id_challenge"]) not in validated_challenges:
+                    validated_challenges.append(int(i["id_challenge"]))
             users[username] = r2["data"]
             return {"status": "ok", "data": username + " registered successfully"}
         if r2["status"] == "error":
@@ -106,25 +119,63 @@ def format_leaderboard() -> discord.Embed:
 
     return embed
 
+def update_users():
+    result = []
+    for username in users.keys():
+        old = users[username]
+        r = get_auteurs_id(int(old["id_auteur"]))
+        if r["status"] == "ok":
+            new = r["data"]
+            if len(old["validations"]) != len(new["validations"]):
+                new_challs = new["validations"][:len(new["validations"]) - len(old["validations"])]
+                for i in new_challs:
+                    if int(i["id_challenge"]) not in validated_challenges:
+                        result.append(":drop_of_blood: " + username + " a first blood " + i["titre"] + " ! Félicitations ! :drop_of_blood:")
+                        validated_challenges.append(int(i["id_challenge"]))
+                    else:
+                        result.append(":fire: " + username + " a solve " + i["titre"] + " ! Félicitations ! :fire:")
+                users[username] = new
+        else:
+            pass
+    return result
+
+        
+
+#users["stregle"] = {'id_auteur': '1078144', 'nom': 'stregle', 'statut': '6forum', 'logo_url': 'IMG/logo/auton0.png', 'score': '0', 'position': '', 'membre': 'false', 'challenges': [], 'solutions': [], 'validations': []}
+#print("stregle registered !")
+
+print("DEBUG", get_auteurs({"nom": "MELO"}))
+#do_register("rayzhed")
+print(users)
+exit(1)
+
 do_register("Ssor")
 print("Ssor registered !")
-#do_register("r0g18")
-#print("r0g18 registered !")
-#do_register("b0tm4n")
-#print("b0tm4n registered !")
-#
-#users["Aube"] = get_auteurs_id(643003)["data"]
-#print("Aube registered !")
-#
-#print(users)
+do_register("r0g18")
+print("r0g18 registered !")
+do_register("b0tm4n")
+print("b0tm4n registered !")
+users["Aube"] = get_auteurs_id(643003)["data"]
+print("Aube registered !")
+users["Melo"] = get_auteurs_id(919505)["data"]
+print("Melo registered !")
+
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+@tasks.loop(minutes=1)
+async def refresh():
+    print("refresh !")
+    channel = bot.get_channel(1470383153376923690)
+    news = update_users()
+    for new in news:
+        await channel.send(new)
+
 @bot.event
 async def on_ready():
     print(f"✅ Bot connecté en tant que {bot.user}")
-    
+    refresh.start()
     try:
         synced = await bot.tree.sync()
         print(f"🔄 {len(synced)} commande(s) slash synchronisée(s)")
@@ -169,4 +220,4 @@ async def leaderboard(interaction: discord.Interaction):
 
 if __name__ == "__main__":
     print("🚀 Démarrage du bot Root-Me...")
-    bot.run(config["DISCORD_TOKEN"])
+    bot.run(config["token"])
