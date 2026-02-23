@@ -205,3 +205,7 @@ class ZoubiCog(commands.Cog):
                 await ctx.send(f"🔄 {len(fmt)} commandes slash synchronisées !")
         except Exception as e:
             await ctx.send(f"❌ Erreur : {e}")
+
+    @app_commands.command(name="help", description="Affiche l'aide")
+    async def help(self, interaction: discord.Interaction):
+        await interaction.response.send_message(embed=utils.get_help_embed())

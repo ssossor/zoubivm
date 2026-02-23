@@ -59,6 +59,26 @@ def get_validation_chall_embed(user_data: dict, validation_data: dict, chall_dat
     return embed
 
 
+def get_help_embed() -> discord.Embed:
+    embed = discord.Embed(title="Menu d'aide pour les gens en recherche d'aide",
+                          description="-------------------------------------------------------------",
+                          colour=0xf6d32d)
+
+    embed.set_author(name="ZoubiVM")
+
+    embed.add_field(name="`/register <profile_name>`",
+                    value="Permet de register un compte Root-me, le paramètre est le nom du profil dans l'url Root-me.\n| __Exemple:__\n| https://www.root-me.org/Aube-643003 -> Aube-643003", inline=False)
+    embed.add_field(name="`/remove <user_id>`", value="Permet de supprimer un compte Root-me enregistré dans la base de donnée, le paramètre est l'id de l'utilisateur.\n| __Exemple:__\n| Aube-643003 -> 643003\n| Ssor -> 822479", inline=False)
+    embed.add_field(name="`/profile <username>`", value="Permet d'afficher le profil d'un utiliateur enregistré dans la base de donnée.\n| __Exemple:__\n| Aube-643003: `/profile Aube` (en ft mon nom rootme c'est Aube officiellement)", inline=False)
+    embed.add_field(name="`/leaderboard`",
+                    value="Permet d'afficher le leaderboard.", inline=False)
+    embed.add_field(
+        name="`/ping`", value="Permet de tester la connectivité du bot.", inline=False)
+    embed.add_field(
+        name="`/list`", value="Permet de lister les utilisateurs enregistrés.", inline=False)
+    return embed
+
+
 def get_leaderboard_embed(users_list: list) -> discord.Embed:
     """
     Return a discord's embed for the leaderboard
