@@ -1,4 +1,5 @@
 import discord
+import asyncio
 from rootmeClient import RootMeClient
 from zoubiClient import ZoubiClient
 from discord.ext import commands
@@ -35,18 +36,25 @@ class DiscordBot(commands.Bot):
         await self.add_cog(ZoubiCog(self, self.rm_client, self.zoubi_client, self.target_channel_id))
 
     async def on_ready(self):
-        logger.info(f"✅ Bot logged in as {bot.user}")
+        logger.info(f"✅ Bot logged in as {self.user}")
         cog = self.get_cog("ZoubiCog")
         if cog and not cog.refresh.is_running():
             cog.refresh.start()
 
 
-if __name__ == "__main__":
+async def start_bot():
     logger.info('Initializing clients...')
-    rm_client = RootMeClient(ROOT_ME_API_KEY)
+    rm_client = await RootMeClient.create(api_key=ROOT_ME_API_KEY)
     zoubi_client = ZoubiClient(USERS_LIST_FILE)
     bot = DiscordBot(rm_client, zoubi_client, int(TARGET_CHANNEL_ID))
 
     logger.info(
         "🚀 Démarrage duuuuue la ZoubiVM, bip bipb boubpoubp ARM boupbipbbip HELP bipbipbipbipbipbiiiiiiiiiiiiiip")
-    bot.run(DISCORD_TOKEN)
+    async with bot:
+        await bot.start(DISCORD_TOKEN)
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(start_bot())
+    except KeyboardInterrupt:
+        logger.info("Arrêt du bot...")

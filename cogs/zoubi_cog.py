@@ -1,7 +1,7 @@
 from discord.ext import commands, tasks
 from discord import app_commands
 import discord
-from rootmeClient import RootMeClient
+from rootmeClient import RootMeClient, RootMeRateLimitError
 from zoubiClient import ZoubiClient
 import logging
 import utils
@@ -25,21 +25,30 @@ class ZoubiCog(commands.Cog):
     async def refresh(self):
         logger.info("Beginning users refresh...")
         all_users = self.zoubi_client.get_all_users()
-        if len(all_users) == 0:
-            logger.info("No user found, skipping refresh.")
+        if not all_users:
             return
 
         updated_indexes = {}
-        try:
-            async with async_playwright() as p:
-                for browser_type in [p.firefox]:
-                    browser = await browser_type.launch()
-                    page = await browser.new_page()
+        user_idx = 0
+        while user_idx < len(all_users):
+            current_proxy = (await self.rm_client.proxy_manager.get()).as_string()
+            logger.error(current_proxy)
 
-                    for i in range(len(all_users)):
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    proxy={"server": current_proxy},
+                    args=["--disable-http2"]
+                )
+                context = await browser.new_context(
+                    ignore_https_errors=True,
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                )
+                page = await context.new_page()
+                try:
+                    while user_idx < len(all_users):
+                        user = all_users[user_idx]
                         try:
-                            user = all_users[i]
-                            points = await self.rm_client.get_user_points_headless(user["profile_id"], browser, page)
+                            points = await self.rm_client.get_user_points_headless(user["profile_id"], page)
                             if points is None:
                                 logger.warning(f"Failed to scrap points for user {
                                     user['profile_id']}")
@@ -53,19 +62,39 @@ class ZoubiCog(commands.Cog):
                                            for v in user["validations"]}
                                 new_validations = [
                                     v for v in fresh_user_data["validations"] if v['id_challenge'] not in old_ids]
-                                updated_indexes[i] = new_validations
+                                updated_indexes[user_idx] = new_validations
 
                                 fresh_user_data["profile_id"] = user["profile_id"]
-                                all_users[i] = fresh_user_data
+                                all_users[user_idx].update(fresh_user_data)
 
+                            user_idx += 1
                         except Exception as e:
-                            logger.error(f"Error scraping user {
-                                user.get('profile_id')}: {e}")
+                            err_str = str(e).lower()
 
-                    await browser.close()
-        except Exception as e:
-            logger.error(f"Playwright error: {e}")
-            return
+                            if "certificate" in err_str:
+                                reason = "Proxy SSL/Certificate Invalid"
+                            elif "429" in err_str:
+                                reason = "Rate Limit (429)"
+                            elif "timeout" in err_str:
+                                reason = "Proxy Timeout"
+                            else:
+                                reason = f"Network Error: {type(e).__name__}"
+
+                            logger.warning(f"Problem : {
+                                           reason}. Rotating proxy...")
+
+                            await self.rm_client.rotate_proxy(reason=reason)
+
+                            raise RootMeRateLimitError(reason)
+
+                except (RootMeRateLimitError, Exception) as e:
+                    if 'browser' in locals():
+                        await browser.close()
+                    if isinstance(e, RootMeRateLimitError):
+                        continue
+                    else:
+                        logger.error(f"Error : {e}")
+                        break
 
         logger.info(
             f"Users list refreshed! ({len(updated_indexes)} modification)")
