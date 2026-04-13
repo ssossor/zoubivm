@@ -108,12 +108,17 @@ class ZoubiCog(commands.Cog):
                     chall_data = await self.rm_client.get_chall_from_id(valid['id_challenge'])
                     chall_data = chall_data[0]
 
+                    # kiperZ
+                    blacklist_rapidos = ["758520"]
+
                     # = First blood verif =
                     current_chall_id = valid['id_challenge']
                     solvers = [
                         u for u in all_users
-                        if any(v['id_challenge'] == current_chall_id for v in u.get('validations', []))
+                        if u.get("id_auteur") not in blacklist_rapidos
+                        and any(v['id_challenge'] == current_chall_id for v in u.get('validations', []))
                     ]
+                    
                     is_first_blood = (len(solvers) == 1)
                     if is_first_blood:
                         logger.info(f"FIRST BLOOD: by {user['nom']} on {

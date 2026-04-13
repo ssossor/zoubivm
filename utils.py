@@ -86,18 +86,22 @@ def get_leaderboard_embed(users_list: list) -> discord.Embed:
     tmp = []
 
     for user in users_list:
-        tmp.append({"username": user["nom"], "points": user["score"]})
+        tmp.append({"username": user["nom"], "points": user["score"], "id_auteur": user["id_auteur"]})
 
-    newlist = sorted(tmp, key=lambda d: int(d['points']), reverse=True)[:10]
+    newlist = sorted(tmp, key=lambda d: int(d['points']), reverse=True)
 
     emojis = [":first_place:", ":second_place:", ":third_place:", ":four:",
               ":five:", ":six:", ":seven:", ":eight:", ":nine:", ":keycap_ten:"]
 
     description = ""
 
-    for i in range(len(newlist)):
-        description += emojis[i] + " **" + newlist[i]["username"] + \
-            "** (" + newlist[i]["points"] + " points)\n"
+    for i, user in enumerate(newlist):
+        if user['id_auteur'] == "643003":
+            prefix = " :polar_bear:"
+        else:
+            prefix = emojis[i] if i < len(emojis) else str(i + 1)
+
+        description += f"{prefix} **{user['username']}** ({user['points']} points)\n"
 
     embed = discord.Embed(title="Leaderboard",
                           description=description, colour=0x00b0f4)
