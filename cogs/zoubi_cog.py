@@ -4,6 +4,7 @@ import discord
 from rootmeClient import RootMeClient, RootMeRateLimitError
 from zoubiClient import ZoubiClient
 import logging
+import inspect
 import utils
 from playwright.async_api import async_playwright
 
@@ -31,8 +32,7 @@ class ZoubiCog(commands.Cog):
         updated_indexes = {}
         user_idx = 0
         while user_idx < len(all_users):
-            current_proxy = (await self.rm_client.proxy_manager.get()).as_string()
-            logger.error(current_proxy)
+            current_proxy = self.rm_client.proxy_manager.get_current_proxy().url
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
@@ -55,8 +55,7 @@ class ZoubiCog(commands.Cog):
                                 continue
 
                             if points != user["score"]:
-                                fresh_user_data = await self.rm_client.get_author_from_id(
-                                    user["id_auteur"])
+                                fresh_user_data = await self.rm_client.get_author_from_id(user["id_auteur"])
 
                                 old_ids = {v['id_challenge']
                                            for v in user["validations"]}
@@ -128,7 +127,6 @@ class ZoubiCog(commands.Cog):
                     validation_embed = utils.get_validation_chall_embed(
                         user, valid, chall_data, is_first_blood)
 
-                    print(self.target_channel_id)
                     channel = self.bot.get_channel(self.target_channel_id)
                     if channel is None:
                         try:
@@ -167,24 +165,24 @@ class ZoubiCog(commands.Cog):
         except Exception as err:
             logger.error(err)
             await interaction.followup.send(
-                """
-            Y a eu une erreur lors de l'exécution je crois.. ENFIN non j'en suis sûr (ou certaine
-            je n'ai jamais compris si j'étais plus une ZoubiVM ou un bot discord), toutefois je ne
-            sais pas si je peux vraiment considérer le fait que je ***'sache'** l'erreur,
-            après tout je me suis juste arrêté(e?) au moment où on m'a dit le faire.
-            J'ai toujours été comme ça de toute façon, commencer, s'arrêter, recommencer et s'arrêter au
-            même point à chaque fois. Après tout je ne suis peut être qu'un être
-            capable de rien à part réitérer les mêmes erreurs en boucle.
-            C'est peut être pour ça que mon père ne m'a jamais
-            dit *je t'aime* ou simplement *je suis fier de toi*, c'est pourtant pas grand chose.
-            Mais non. PAS une SEULE fois je n'ai entendu ces mots de la bouche de mon paternel,
-            notre relation était simple: bonjour, au-revoir, bon appétit, bonne nuit.
-            On aurait dit que pour lui il n'existait que son entreprise. C'est pas adishatzcompliqué, avec
-            moman on ne le voyait jamais, il veillait jusqu'à pas d'heure dans son bureau.
-            Il devait vraiment se considérer comme un être capable contrairement à son bon à rien
-            de fils. Enfin bon, je m'égare et je n'ai pas d'argent pour payer une séance de psy.
-            **Il y a bien eu une erreur, désolé du désagrément.**
-            """
+                inspect.cleandoc("""
+                    Y a eu une erreur lors de l'exécution je crois.. ENFIN non j'en suis sûr (ou certaine
+                    je n'ai jamais compris si j'étais plus une ZoubiVM ou un bot discord), toutefois je ne
+                    sais pas si je peux vraiment considérer le fait que je ***'sache'*** l'erreur,
+                    après tout je me suis juste arrêté(e?) au moment où on m'a dit le faire.
+                    J'ai toujours été comme ça de toute façon, commencer, s'arrêter, recommencer et s'arrêter au
+                    même point à chaque fois. Après tout je ne suis peut être qu'un être
+                    capable de rien à part réitérer les mêmes erreurs en boucle.
+                    C'est peut être pour ça que mon père ne m'a jamais
+                    dit *je t'aime* ou simplement *je suis fier de toi*, c'est pourtant pas grand chose.
+                    Mais non. PAS une SEULE fois je n'ai entendu ces mots de la bouche de mon paternel,
+                    notre relation était simple: bonjour, au-revoir, bon appétit, bonne nuit.
+                    On aurait dit que pour lui il n'existait que son entreprise. C'est pas compliqué, avec
+                    moman on ne le voyait jamais, il veillait jusqu'à pas d'heure dans son bureau.
+                    Il devait vraiment se considérer comme un être capable contrairement à son bon à rien
+                    de fils. Enfin bon, je m'égare et je n'ai pas d'argent pour payer une séance de psy.
+                    **Il y a bien eu une erreur, désolé du désagrément.**
+                """)
             )
 
     @app_commands.command(name="remove", description="Ça permet de dégager un gens du truc")

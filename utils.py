@@ -1,5 +1,5 @@
 import discord
-import datetime
+from datetime import datetime
 
 BASE_URL = "https://www.root-me.org"
 
@@ -35,7 +35,7 @@ def get_validation_chall_embed(user_data: dict, validation_data: dict, chall_dat
     validation_timestamp = datetime.strptime(
         validation_data["date"], "%Y-%m-%d %H:%M:%S")
 
-    name = "🩸FFirst🩸Blood " if is_first_blood else "Nouvelle validation"
+    name = "🩸First🩸Blood " if is_first_blood else "Nouvelle validation"
 
     desc = f"{user_data['nom']
               } vient de flag\n+{chall_data['score']} points"
