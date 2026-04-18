@@ -2,9 +2,7 @@ import httpx
 import asyncio
 import logging
 import random
-
-logger = logging.getLogger("ProxyManager")
-
+from .base import BaseProxyManager
 
 class Proxy:
     def __init__(self, data: dict):
@@ -16,25 +14,24 @@ class Proxy:
         self.timeout_ms = data.get("timeout_ms")
         self.is_working = data.get("is_working", True)
 
-    def as_string(self) -> str:
         prefix = "socks5" if "socks5" in self.protocol else "http"
-        return f"{prefix}://{self.address}:{self.port}"
+        self.url = f"{prefix}://{self.address}:{self.port}"
 
     def __repr__(self):
-        return f"<Proxy {self.as_string()} ({self.country_code})>"
+        return f"<Proxy {self.url} ({self.country_code})>"
 
 
-class ZoubiProxy:
+class ZoubiProxy(BaseProxyManager):
     API_URL = "https://free.redscrape.com/api/proxies"
 
-    def __init__(self, country=None, protocol="http", max_timeout=500):
-        self.country = country
+    def __init__(self, countries=None, protocol="http", max_timeout=500):
+        super().__init__()
+
+        self.countries = countries
         self.protocol = protocol
         self.max_timeout = max_timeout
 
-        self.proxies = []
         self.current_index = 0
-        self.lock = asyncio.Lock()
 
     async def _fetch_proxies(self):
         params = {
@@ -43,8 +40,12 @@ class ZoubiProxy:
             "format": "json"
         }
 
-        if self.country:
-            params["country"] = ",".join(self.country)
+        # FIXME: self.countries ne fonctionne pas, je n'ai pas trouvé comment lui passer
+        # correctement via les query params
+        '''
+        if self.countries:
+            params["country"] = ",".join(self.countries)
+        '''
 
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -55,37 +56,38 @@ class ZoubiProxy:
                 new_proxies = [Proxy(p) for p in data if p.get("is_working")]
 
                 if not new_proxies:
-                    logger.warning("No proxy found!")
+                    self.logger.warning("No proxy found!")
                     return False
 
                 random.shuffle(new_proxies)
 
                 self.proxies = new_proxies
                 self.current_index = 0
-                logger.info(f"Fetched {len(self.proxies)
-                                       } new proxies from RedScrape")
+                self.current_proxy = self.proxies[self.current_index]
+                self.logger.info(f"Fetched {len(self.proxies)} new proxies from RedScrape")
                 return True
 
         except Exception as e:
-            logger.error(f"Error fetching RedScrape : {e}")
+            self.logger.error(f"Error fetching RedScrape : {e}")
             return False
 
-    async def get(self) -> Proxy:
+    def get_current_proxy(self) -> Proxy:
+        return self.proxies[self.current_index]
+
+    async def get_proxies(self) -> Proxy:
         async with self.lock:
             if not self.proxies:
                 success = await self._fetch_proxies()
                 if not success:
                     return None
 
-            return self.proxies[self.current_index]
-
     async def rotate(self):
         async with self.lock:
             self.current_index += 1
 
             if self.current_index >= len(self.proxies):
-                logger.info("No more proxy, refreshing...")
+                self.logger.info("No more proxy, refreshing...")
                 await self._fetch_proxies()
             else:
-                logger.debug(f"Rotated to next proxy: {
-                             self.proxies[self.current_index]}")
+                self.current_proxy = self.proxies[self.current_index]
+                self.logger.debug(f"Rotated to next proxy: {self.proxies[self.current_index]}")

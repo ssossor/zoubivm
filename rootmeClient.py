@@ -4,7 +4,7 @@ import re
 import random
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
-from zoubiProxy import ZoubiProxy
+from proxy_manager import IndustrialZoubiProxy, ZoubiProxy
 import logging
 
 logging.basicConfig(
@@ -28,11 +28,13 @@ class RootMeRateLimitError(Exception):
 class RootMeClient:
     URL = "https://api.www.root-me.org"
     BASE_URL = "https://www.root-me.org"
+    MAX_RETRIES = 3
 
     def __init__(self, api_key):
         self.api_key = api_key
         self.cookies = {"api_key": api_key}
-        self.proxy_manager = ZoubiProxy(
+        self.proxy_manager = IndustrialZoubiProxy(
+            countries = ["GB", "DE", "FR", "CA", "ES", "IT", "BE", "CH", "LU", "NL", "PT"],
             protocol="socks5",
             max_timeout=250
         )
@@ -43,14 +45,17 @@ class RootMeClient:
     async def create(cls, api_key):
         self = cls(api_key)
 
-        await self.proxy_manager.rotate()
+        await self.proxy_manager.get_proxies()
+
+        if not self.proxy_manager.get_current_proxy():
+            raise Exception("No proxy found !")
+
         await self._init_client()
 
         return self
 
     async def _init_client(self):
-        proxy_obj = await self.proxy_manager.get()
-        proxy_str = proxy_obj.as_string() if proxy_obj else None
+        proxy = self.proxy_manager.get_current_proxy()
 
         if self.client:
             await self.client.aclose()
@@ -58,11 +63,11 @@ class RootMeClient:
         self.client = httpx.AsyncClient(
             base_url=self.URL,
             cookies=self.cookies,
-            proxy=proxy_str,
+            proxy=proxy.url,
             timeout=10.0
         )
-        logger.info(f"Root Me Client initialized!\nProxy: {proxy_str}")
-        logger.info(f"Proxies available: {self.proxy_manager.proxies}")
+        logger.info(f"Root Me Client initialized!\nProxy: {proxy}")
+        logger.info(f"Proxies available: {len(self.proxy_manager.proxies)}")
 
     async def rotate_proxy(self, reason="Unknown"):
         """Secure proxy rotation"""
@@ -77,20 +82,10 @@ class RootMeClient:
             await asyncio.sleep(0.5)
 
     async def request(self, method, endpoint, **kwargs):
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                response = await self.client.request(method, endpoint, **kwargs)
+        response = await self.client.request(method, endpoint, **kwargs)
 
-                if response.status_code == 429:
-                    if attempt < self.MAX_RETRIES - 1:
-                        await self._handle_429()
-                        continue
-
-                return response
-
-            except (httpx.ProxyError, httpx.ConnectError):
-                await self._handle_429()
-                continue
+        if response.status_code == 429:
+            raise RootMeRateLimitError
 
         return response
 
@@ -170,7 +165,7 @@ class RootMeClient:
         response = await self.request("GET", endpoint, params=params)
 
         if response.status_code >= 400 and response.status_code != 429:
-            logger.error(f"API Eroor {response.status_code} : {endpoint}")
+            logger.error(f"API Error {response.status_code} : {endpoint}")
 
         return response
 
