@@ -141,7 +141,7 @@ class ZoubiCog(commands.Cog):
     async def ping(self, interaction: discord.Interaction):
         await interaction.response.send_message("pong!")
 
-    @app_commands.command(name="register", description="Faut le lien https de votre profil rootme")
+    @app_commands.command(name="register", description="Faut votre nom sur l'url de votre profil rootme")
     async def register(self, interaction: discord.Interaction, rootme_profile_id: str):
         await interaction.response.defer(thinking=True)
         try:
