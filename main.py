@@ -57,7 +57,7 @@ class DiscordBot(commands.Bot):
 
 async def start_bot():
     logger.info('Initializing clients...')
-    rm_client = await RootMeClient.create(api_key=api_keys)
+    rm_client = await RootMeClient.create(api_keys=api_keys)
     zoubi_client = ZoubiClient(USERS_LIST_FILE)
     bot = DiscordBot(rm_client, zoubi_client, int(TARGET_CHANNEL_ID))
 
