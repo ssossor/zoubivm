@@ -9,16 +9,16 @@ def get_user_profile_embed(json: dict) -> discord.Embed:
     Return a discord's embed for a user profile
     """
     last_challs = json["validations"][:3]
-    last_challs_formatted = "*Aucun challenge validé*"
+    last_challs_formatted = "*No challenges validated*"
 
     if last_challs:
         last_challs_formatted = "\n".join(
             [f"- {v['titre']}" for v in last_challs])
 
-    title = "Profil de " + json["nom"]
+    title = "Profile of " + json["nom"]
     url = f"{BASE_URL}/{json["profile_id"]}"
-    description = "**Points :** " + \
-        json["score"] + "\n**Derniers challs validés :**\n" + \
+    description = "**Points:** " + \
+        json["score"] + "\n**Last validated challenges:**\n" + \
         last_challs_formatted
 
     embed = discord.Embed(title=title, url=url,
@@ -35,13 +35,13 @@ def get_validation_chall_embed(user_data: dict, validation_data: dict, chall_dat
     validation_timestamp = datetime.strptime(
         validation_data["date"], "%Y-%m-%d %H:%M:%S")
 
-    name = "🩸First🩸Blood " if is_first_blood else "Nouvelle validation"
+    name = "🩸First🩸Blood " if is_first_blood else "New validation"
 
     desc = f"{user_data['nom']
-              } vient de flag\n+{chall_data['score']} points"
+              } just solved a challenge!\n+{chall_data['score']} points"
     if is_first_blood:
         desc = f"{user_data['nom']
-                  } vient de first blood\n+{chall_data['score']} points"
+                  } got first blood!\n+{chall_data['score']} points"
 
     embed = discord.Embed(title=validation_data["titre"],
                           url=f"{BASE_URL}/{chall_data['url_challenge']}",
@@ -51,7 +51,7 @@ def get_validation_chall_embed(user_data: dict, validation_data: dict, chall_dat
 
     embed.set_author(name=name)
 
-    embed.add_field(name="Nouveau score",
+    embed.add_field(name="New score",
                     value=f"{user_data['score']} points",
                     inline=False)
 
@@ -60,22 +60,22 @@ def get_validation_chall_embed(user_data: dict, validation_data: dict, chall_dat
 
 
 def get_help_embed() -> discord.Embed:
-    embed = discord.Embed(title="Menu d'aide pour les gens en recherche d'aide",
+    embed = discord.Embed(title="Help menu",
                           description="-------------------------------------------------------------",
                           colour=0xf6d32d)
 
     embed.set_author(name="ZoubiVM")
 
     embed.add_field(name="`/register <profile_name>`",
-                    value="Permet de register un compte Root-me, le paramètre est le nom du profil dans l'url Root-me.\n| __Exemple:__\n| https://www.root-me.org/Aube-643003 -> Aube-643003", inline=False)
-    embed.add_field(name="`/remove <user_id>`", value="Permet de supprimer un compte Root-me enregistré dans la base de donnée, le paramètre est l'id de l'utilisateur.\n| __Exemple:__\n| Aube-643003 -> 643003\n| Ssor -> 822479", inline=False)
-    embed.add_field(name="`/profile <username>`", value="Permet d'afficher le profil d'un utiliateur enregistré dans la base de donnée.\n| __Exemple:__\n| Aube-643003: `/profile Aube` (en ft mon nom rootme c'est Aube officiellement)", inline=False)
+                    value="Register a Root-me account. The parameter is the profile name from your Root-me URL.\n| __Example:__\n| https://www.root-me.org/Aube-643003 -> Aube-643003", inline=False)
+    embed.add_field(name="`/remove <user_id>`", value="Remove a registered Root-me account from the database. The parameter is the user's ID.\n| __Example:__\n| Aube-643003 -> 643003\n| Ssor -> 822479", inline=False)
+    embed.add_field(name="`/profile <username>`", value="Display the profile of a registered user from the database.\n| __Example:__\n| Aube-643003: `/profile Aube`", inline=False)
     embed.add_field(name="`/leaderboard`",
-                    value="Permet d'afficher le leaderboard.", inline=False)
+                    value="Display the leaderboard.", inline=False)
     embed.add_field(
-        name="`/ping`", value="Permet de tester la connectivité du bot.", inline=False)
+        name="`/ping`", value="Test bot connectivity.", inline=False)
     embed.add_field(
-        name="`/list`", value="Permet de lister les utilisateurs enregistrés.", inline=False)
+        name="`/list`", value="List all registered users.", inline=False)
     return embed
 
 

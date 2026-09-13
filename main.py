@@ -49,7 +49,7 @@ async def start_bot():
     bot = DiscordBot(rm_client, zoubi_client, int(TARGET_CHANNEL_ID))
 
     logger.info(
-        "🚀 Démarrage duuuuue la ZoubiVM, bip bipb boubpoubp ARM boupbipbbip HELP bipbipbipbipbipbiiiiiiiiiiiiiip")
+        "🚀 Starting ZoubiVM, bip bipb boubpoubp ARM boupbipbbip HELP bipbipbipbipbipbiiiiiiiiiiiiiip")
     async with bot:
         await bot.start(DISCORD_TOKEN)
 
@@ -57,4 +57,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(start_bot())
     except KeyboardInterrupt:
-        logger.info("Arrêt du bot...")
+        logger.info("Stopping bot...")

@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import random
+from typing import List
 
 from ..base import BaseProxyManager
 from ..providers.base import BaseProxyProvider, ProxyData, ProxyFilter, ProxyResponse
