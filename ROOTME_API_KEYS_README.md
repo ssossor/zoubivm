@@ -20,15 +20,7 @@ Create a file named `rootme_api_keys.json` in the project root with your API key
 
 The bot will automatically load keys from this file if it exists.
 
-### Option 2: Using Environment Variable (Backward Compatible)
-
-You can still use a single API key via the `.env` file:
-
-```
-ROOT_ME_API_KEY=your_single_api_key
-```
-
-### Option 3: Custom JSON File Path
+### Option 2: Custom JSON File Path
 
 You can specify a custom path for the API keys file in your `.env`:
 
@@ -40,11 +32,10 @@ ROOT_ME_API_KEYS_FILE=/path/to/your/custom_api_keys.json
 
 The bot will try to load API keys in the following order:
 
-1. **Single key from environment** (`ROOT_ME_API_KEY` in `.env`)
-2. **Custom JSON file path** (`ROOT_ME_API_KEYS_FILE` in `.env`)
-3. **Default JSON file** (`rootme_api_keys.json` in project root)
+1. **Custom JSON file path** (`ROOT_ME_API_KEYS_FILE` in `.env`)
+2. **Default JSON file** (`rootme_api_keys.json` in project root)
 
-If none of these are available, the bot will raise an error on startup.
+If neither is available, the bot will raise an error on startup.
 
 ## How It Works
 
@@ -104,10 +95,10 @@ keys = RootMeClient.load_api_keys_from_file("/path/to/keys.json")
 
 ## Integration with Proxy Rotation
 
-The system works alongside the existing proxy rotation mechanism. When an error occurs:
+The system works alongside the existing proxy rotation mechanism. When a rate limit error occurs:
 
-1. If multiple API keys are available, the API key is rotated first
-2. The proxy is always rotated (existing behavior)
+1. The API key is rotated (if multiple keys are available)
+2. The proxy is always rotated
 
 This provides two layers of protection against rate limiting:
 - API key rotation at the RootMe API level

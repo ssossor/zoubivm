@@ -17,26 +17,18 @@ logger = logging.getLogger(__name__)
 config = dotenv_values(".env")
 logger.debug(config)
 
-# Load RootMe API keys - supports both single key (backward compatibility) and JSON file
-ROOT_ME_API_KEY = config.get("ROOT_ME_API_KEY")
+# Load RootMe API keys from JSON file
 ROOT_ME_API_KEYS_FILE = config.get("ROOT_ME_API_KEYS_FILE", "rootme_api_keys.json")
 
-# Determine API keys to use
-if ROOT_ME_API_KEY:
-    # Use single API key from environment (backward compatibility)
-    api_keys = [ROOT_ME_API_KEY]
-    logger.info(f"Using single API key from environment")
-elif os.path.exists(ROOT_ME_API_KEYS_FILE):
-    # Load from JSON file
+# Load API keys
+if os.path.exists(ROOT_ME_API_KEYS_FILE):
     api_keys = RootMeClient.load_api_keys_from_file(ROOT_ME_API_KEYS_FILE)
     logger.info(f"Loaded {len(api_keys)} API keys from {ROOT_ME_API_KEYS_FILE}")
+elif os.path.exists("rootme_api_keys.json"):
+    api_keys = RootMeClient.load_api_keys_from_file()
+    logger.info(f"Loaded {len(api_keys)} API keys from default file")
 else:
-    # Try default file
-    if os.path.exists("rootme_api_keys.json"):
-        api_keys = RootMeClient.load_api_keys_from_file()
-        logger.info(f"Loaded {len(api_keys)} API keys from default file")
-    else:
-        raise FileNotFoundError("No RootMe API key found. Set ROOT_ME_API_KEY or create rootme_api_keys.json")
+    raise FileNotFoundError("No RootMe API keys found. Create rootme_api_keys.json or set ROOT_ME_API_KEYS_FILE in .env")
 
 DISCORD_TOKEN = config["DISCORD_TOKEN"]
 TARGET_CHANNEL_ID = config["TARGET_CHANNEL_ID"]

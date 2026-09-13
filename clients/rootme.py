@@ -5,8 +5,7 @@ import asyncio
 import logging
 import json
 import os
-from pathlib import Path
-from typing import Union, List, Optional
+from typing import List, Optional
 
 from playwright.async_api import async_playwright
 from proxy_manager import IndustrialProxy, DefaultProxyProvider
@@ -26,20 +25,26 @@ logger = logging.getLogger(__name__)
 
 class RootMeClient:
     """
-    RootMe API client with optional proxy support.
+    RootMe API client with optional proxy support and API key rotation.
     
     This client allows you to interact with the RootMe API and website
     with or without proxies. If proxies are not available, it falls back
-    to direct connections.
+    to direct connections. API keys can be rotated automatically when
+    rate limits (HTTP 429) are encountered.
     
     Usage:
-        # Without proxy (default)
-        client = await RootMeClient.create(api_key)
+        # Load keys from JSON file
+        client = await RootMeClient.create_from_file()
+        
+        # With list of API keys
+        client = await RootMeClient.create(
+            api_keys=["key1", "key2", "key3"]
+        )
         
         # With custom provider
         from proxy_manager.providers import RedScrapeProxyProvider
         client = await RootMeClient.create(
-            api_key,
+            api_keys=["key1", "key2"],
             proxy_provider=RedScrapeProxyProvider()
         )
         
@@ -97,21 +102,19 @@ class RootMeClient:
         api_keys = cls.load_api_keys_from_file(file_path)
         return await cls.create(api_keys, proxy_provider)
 
-    def __init__(self, api_key: Union[str, List[str]], proxy_provider=None):
+    def __init__(self, api_keys: List[str], proxy_provider=None):
         """
         Initialize RootMeClient.
         
         Args:
-            api_key: RootMe API key (string) or list of API keys for rotation
+            api_keys: List of RootMe API keys for rotation
             proxy_provider: Optional proxy provider implementation
                            If None, uses DefaultProxyProvider (no proxies)
         """
-        # Support both single key (backward compatibility) and list of keys
-        if isinstance(api_key, str):
-            self.api_keys = [api_key]
-        else:
-            self.api_keys = api_key
+        if not isinstance(api_keys, list) or len(api_keys) == 0:
+            raise ValueError("api_keys must be a non-empty list of strings")
         
+        self.api_keys = api_keys
         self.current_key_index = 0
         self.cookies = {"api_key": self._get_current_api_key()}
         
@@ -128,12 +131,12 @@ class RootMeClient:
         self.key_lock = asyncio.Lock()
 
     @classmethod
-    async def create(cls, api_key: str, proxy_provider=None):
+    async def create(cls, api_keys: List[str], proxy_provider=None):
         """
         Create and initialize a RootMeClient instance.
         
         Args:
-            api_key: RootMe API key
+            api_keys: List of RootMe API keys
             proxy_provider: Optional proxy provider
             
         Returns:
@@ -142,7 +145,7 @@ class RootMeClient:
         Raises:
             None - Works without proxies if none are available
         """
-        self = cls(api_key, proxy_provider)
+        self = cls(api_keys, proxy_provider)
         
         # Initialize proxies
         await self.proxy_manager.get_proxies()
