@@ -1,7 +1,8 @@
 from discord.ext import commands, tasks
 from discord import app_commands
 import discord
-from rootmeClient import RootMeClient, RootMeRateLimitError
+from clients import RootMeClient
+from clients.utils import RootMeRateLimitError
 from zoubiClient import ZoubiClient
 import logging
 import inspect
@@ -22,7 +23,7 @@ class ZoubiCog(commands.Cog):
         self.zoubi_client = zoubi_client
         self.target_channel_id = target_channel_id
 
-    @tasks.loop(minutes=2)
+    @tasks.loop(minutes=5)
     async def refresh(self):
         logger.info("Beginning users refresh...")
         all_users = self.zoubi_client.get_all_users()
@@ -32,11 +33,12 @@ class ZoubiCog(commands.Cog):
         updated_indexes = {}
         user_idx = 0
         while user_idx < len(all_users):
-            current_proxy = self.rm_client.proxy_manager.get_current_proxy().url
+            current_proxy = self.rm_client.proxy_manager.get_current_proxy()
+            proxy_url = current_proxy.url if current_proxy else None
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
-                    proxy={"server": current_proxy},
+                    proxy={"server": proxy_url} if proxy_url else None,
                     args=["--disable-http2"]
                 )
                 context = await browser.new_context(

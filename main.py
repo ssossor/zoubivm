@@ -1,6 +1,6 @@
 import discord
 import asyncio
-from rootmeClient import RootMeClient
+from clients import RootMeClient
 from zoubiClient import ZoubiClient
 from discord.ext import commands
 from dotenv import dotenv_values

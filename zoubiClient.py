@@ -1,7 +1,7 @@
 import json
 import os
 import discord
-from rootmeClient import RootMeClient
+from clients import RootMeClient
 import logging
 
 logging.basicConfig(
