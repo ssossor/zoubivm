@@ -1,5 +1,5 @@
 # Installation
-Faut remplir le .env comme ça:
+Fill the .env file as follows:
 
 ```
 DISCORD_TOKEN=
@@ -8,42 +8,42 @@ TARGET_CHANNEL_ID=
 USERS_LIST_FILE=users.json
 ```
 
-Et activer sur le bot l'option:
+And enable the following option for the bot:
 `Message Content Intent`
-(C'est dans le dev portal de discord)
+(Found in the Discord developer portal)
 
-Ensuite faut faire
+Then run:
 ```
 pip install -r requirements.txt
 playwright install
 ```
 
-# Démarrage
+# Starting
 ```
 python main.py
 ```
 
-# Commandes
-`/register <profile_name>`: Permet de register un compte Root-me, le paramètre est le nom du profil dans l'url Root-me.
+# Commands
+`/register <profile_name>`: Register a Root-me account. The parameter is the profile name from your Root-me URL.
 
->Exemple:<br>
+>Example:<br>
 >https://www.root-me.org/Aube-643003 -> Aube-643003
 
-`/remove <user_id>`: Permet de supprimer un compte Root-me enregistré dans la base de donnée, le paramètre est l'id de l'utilisateur.
+`/remove <user_id>`: Remove a registered Root-me account from the database. The parameter is the user's ID.
 
->Exemple:<br>
+>Example:<br>
 >Aube-643003 -> 643003<br>
 >Ssor -> 822479
 
-`/leaderboard`: Permet d'afficher le leaderboard.
+`/leaderboard`: Display the leaderboard.
 
-`/profile <username>`: Permet d'afficher le profil d'un utiliateur enregistré dans la base de donnée.
+`/profile <username>`: Display the profile of a registered user from the database.
 
->Exemple:<br>
->Aube-643003: `/profile Aube` (parce que en ft mon nom rootme c'est Aube officiellement)
+>Example:<br>
+>Aube-643003: `/profile Aube`
 
-`/ping`: Permet de tester le bot.
+`/ping`: Test the bot.
 
-`/list`: Permet d'afficher les utilisateurs enregistrés dans la base de donnée.
+`/list`: Display all registered users from the database.
 
-`!sync`: Permet de synchroniser les commandes / de discord avec Discord.
+`!sync`: Sync Discord slash commands.
