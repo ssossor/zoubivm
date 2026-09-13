@@ -4,3 +4,4 @@ venv/
 **/__pycache__/ 
 screenshots/
 users.json
+rootme_api_keys.json

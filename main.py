@@ -5,6 +5,7 @@ from zoubiClient import ZoubiClient
 from discord.ext import commands
 from dotenv import dotenv_values
 import logging
+import os
 from cogs.zoubi_cog import ZoubiCog
 
 logging.basicConfig(
@@ -16,7 +17,27 @@ logger = logging.getLogger(__name__)
 config = dotenv_values(".env")
 logger.debug(config)
 
-ROOT_ME_API_KEY = config["ROOT_ME_API_KEY"]
+# Load RootMe API keys - supports both single key (backward compatibility) and JSON file
+ROOT_ME_API_KEY = config.get("ROOT_ME_API_KEY")
+ROOT_ME_API_KEYS_FILE = config.get("ROOT_ME_API_KEYS_FILE", "rootme_api_keys.json")
+
+# Determine API keys to use
+if ROOT_ME_API_KEY:
+    # Use single API key from environment (backward compatibility)
+    api_keys = [ROOT_ME_API_KEY]
+    logger.info(f"Using single API key from environment")
+elif os.path.exists(ROOT_ME_API_KEYS_FILE):
+    # Load from JSON file
+    api_keys = RootMeClient.load_api_keys_from_file(ROOT_ME_API_KEYS_FILE)
+    logger.info(f"Loaded {len(api_keys)} API keys from {ROOT_ME_API_KEYS_FILE}")
+else:
+    # Try default file
+    if os.path.exists("rootme_api_keys.json"):
+        api_keys = RootMeClient.load_api_keys_from_file()
+        logger.info(f"Loaded {len(api_keys)} API keys from default file")
+    else:
+        raise FileNotFoundError("No RootMe API key found. Set ROOT_ME_API_KEY or create rootme_api_keys.json")
+
 DISCORD_TOKEN = config["DISCORD_TOKEN"]
 TARGET_CHANNEL_ID = config["TARGET_CHANNEL_ID"]
 USERS_LIST_FILE = config["USERS_LIST_FILE"]
@@ -44,7 +65,7 @@ class DiscordBot(commands.Bot):
 
 async def start_bot():
     logger.info('Initializing clients...')
-    rm_client = await RootMeClient.create(api_key=ROOT_ME_API_KEY)
+    rm_client = await RootMeClient.create(api_key=api_keys)
     zoubi_client = ZoubiClient(USERS_LIST_FILE)
     bot = DiscordBot(rm_client, zoubi_client, int(TARGET_CHANNEL_ID))
 

@@ -3,6 +3,10 @@
 import httpx
 import asyncio
 import logging
+import json
+import os
+from pathlib import Path
+from typing import Union, List, Optional
 
 from playwright.async_api import async_playwright
 from proxy_manager import IndustrialProxy, DefaultProxyProvider
@@ -49,18 +53,67 @@ class RootMeClient:
     URL = "https://api.www.root-me.org"
     BASE_URL = "https://www.root-me.org"
     MAX_RETRIES = 3
+    DEFAULT_API_KEYS_FILE = "rootme_api_keys.json"
 
-    def __init__(self, api_key: str, proxy_provider=None):
+    @staticmethod
+    def load_api_keys_from_file(file_path: Optional[str] = None) -> List[str]:
+        """
+        Load API keys from a JSON file.
+        
+        Args:
+            file_path: Path to JSON file. If None, uses DEFAULT_API_KEYS_FILE
+            
+        Returns:
+            List of API keys
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If file format is invalid
+        """
+        path = file_path or RootMeClient.DEFAULT_API_KEYS_FILE
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"API keys file not found: {path}")
+        
+        with open(path, 'r') as f:
+            data = json.load(f)
+        
+        if not isinstance(data, list):
+            raise ValueError(f"API keys file must contain a list, got {type(data)}")
+        
+        return data
+
+    @classmethod
+    async def create_from_file(cls, file_path: Optional[str] = None, proxy_provider=None):
+        """
+        Create a RootMeClient from a JSON file containing API keys.
+        
+        Args:
+            file_path: Path to JSON file with API keys
+            proxy_provider: Optional proxy provider
+            
+        Returns:
+            Initialized RootMeClient instance
+        """
+        api_keys = cls.load_api_keys_from_file(file_path)
+        return await cls.create(api_keys, proxy_provider)
+
+    def __init__(self, api_key: Union[str, List[str]], proxy_provider=None):
         """
         Initialize RootMeClient.
         
         Args:
-            api_key: RootMe API key
+            api_key: RootMe API key (string) or list of API keys for rotation
             proxy_provider: Optional proxy provider implementation
                            If None, uses DefaultProxyProvider (no proxies)
         """
-        self.api_key = api_key
-        self.cookies = {"api_key": api_key}
+        # Support both single key (backward compatibility) and list of keys
+        if isinstance(api_key, str):
+            self.api_keys = [api_key]
+        else:
+            self.api_keys = api_key
+        
+        self.current_key_index = 0
+        self.cookies = {"api_key": self._get_current_api_key()}
         
         # Set up proxy manager
         self.proxy_manager = IndustrialProxy(
@@ -72,6 +125,7 @@ class RootMeClient:
         
         self.client = None
         self.lock = asyncio.Lock()
+        self.key_lock = asyncio.Lock()
 
     @classmethod
     async def create(cls, api_key: str, proxy_provider=None):
@@ -124,6 +178,28 @@ class RootMeClient:
             logger.info("RootMe Client initialized without proxy")
         
         logger.info(f"Proxies available: {len(self.proxy_manager.proxies)}")
+        logger.info(f"API Keys available: {len(self.api_keys)}")
+
+    def _get_current_api_key(self) -> str:
+        """Get the current API key based on index."""
+        return self.api_keys[self.current_key_index]
+
+    async def rotate_api_key(self, reason: str = "Unknown"):
+        """
+        Rotate to the next API key.
+        
+        Args:
+            reason: Reason for rotation (for logging)
+        """
+        async with self.key_lock:
+            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+            new_key = self._get_current_api_key()
+            self.cookies = {"api_key": new_key}
+            
+            # Reinitialize HTTP client with new API key
+            await self._init_http_client()
+            
+            logger.warning(f"Rotated API key ({self.current_key_index}/{len(self.api_keys)}) for: {reason}")
 
     async def close(self):
         """Close the client and its resources."""
@@ -168,6 +244,9 @@ class RootMeClient:
         response = await self.client.request(method, endpoint, **kwargs)
         
         if response.status_code == 429:
+            # Try to rotate API key if multiple keys are available
+            if len(self.api_keys) > 1:
+                await self.rotate_api_key("Rate limit (429)")
             raise RootMeRateLimitError("Rate limit exceeded")
         
         return response

@@ -8,6 +8,16 @@ TARGET_CHANNEL_ID=
 USERS_LIST_FILE=users.json
 ```
 
+**Alternative for multiple API keys**: Instead of `ROOT_ME_API_KEY`, you can create a `rootme_api_keys.json` file with an array of API keys:
+```json
+[
+    "your_first_api_key",
+    "your_second_api_key",
+    "your_third_api_key"
+]
+```
+See [ROOTME_API_KEYS_README.md](ROOTME_API_KEYS_README.md) for more details on API key rotation.
+
 And enable the following option for the bot:
 `Message Content Intent`
 (Found in the Discord developer portal)

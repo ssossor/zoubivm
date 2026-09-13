@@ -82,8 +82,11 @@ class ZoubiCog(commands.Cog):
                                 reason = f"Network Error: {type(e).__name__}"
 
                             logger.warning(f"Problem : {
-                                           reason}. Rotating proxy...")
+                                           reason}. Rotating proxy and API key...")
 
+                            # Rotate both proxy and API key
+                            if len(self.rm_client.api_keys) > 1:
+                                await self.rm_client.rotate_api_key(reason=reason)
                             await self.rm_client.rotate_proxy(reason=reason)
 
                             raise RootMeRateLimitError(reason)
