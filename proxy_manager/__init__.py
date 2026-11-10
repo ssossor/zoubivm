@@ -77,6 +77,8 @@ from .providers import (
     BaseProxyProvider,
     DefaultProxyProvider,
     RedScrapeProxyProvider,
+    GeonodeProxyProvider,
+    ProxyScrapeProxyProvider,
     ProxyData,
     ProxyFilter,
     ProxyResponse,
@@ -97,6 +99,8 @@ __all__ = [
     "BaseProxyProvider",
     "DefaultProxyProvider",
     "RedScrapeProxyProvider",
+    "GeonodeProxyProvider",
+    "ProxyScrapeProxyProvider",
     # Data Classes
     "ProxyData",
     "ProxyFilter",

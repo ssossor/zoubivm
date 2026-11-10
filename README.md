@@ -22,8 +22,13 @@ cp rootme_api_keys.example.json rootme_api_keys.json
 ```
 DISCORD_TOKEN=
 TARGET_CHANNEL_ID=
+LOG_CHANNEL_ID=
 USERS_LIST_FILE=data/users.json
 ```
+
+- `TARGET_CHANNEL_ID`: channel where new validations are announced.
+- `LOG_CHANNEL_ID` (optional): channel where the bot reports serious problems (see
+  [Log channel](#log-channel)). Leave it empty to disable it.
 
 The bot keeps its data (`users.json`, `challenges.json`) in the `data/` folder.
 If you are upgrading from a version that kept `users.json` at the root, move it:
@@ -52,11 +57,47 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Or with Docker Compose (`data/`, `.env` and `rootme_api_keys.json` are mounted into the
+container):
+```
+make up      # start
+make logs    # follow logs
+make down    # stop
+```
+
+# Root-Me rate limits and proxies
+The bot refreshes every registered user every 5 minutes through the Root-Me API.
+
+- It starts on its own IP, without any proxy.
+- On a rate limit (HTTP 429), it switches to the next API key and to free European
+  SOCKS5 proxies: it fetches them from [Geonode](https://geonode.com/free-proxy-list)
+  (uptime >= 90 %), tests them and uses the fastest one.
+  [ProxyScrape](https://proxyscrape.com/free-proxy-list) is used as a fallback when
+  Geonode gives no working proxy.
+- When a proxy fails or is rate limited, it moves to the next one. After 3 failed
+  attempts, it gives up on the request, waits 60 s and goes on with the next user.
+- When every proxy has been used, a new list is fetched. If no proxy works, the bot
+  stays on its own IP and waits as asked by Root-Me (`Retry-After`).
+
+See [proxy_manager/README.md](proxy_manager/README.md) to add another proxy provider.
+
+# Log channel
+When `LOG_CHANNEL_ID` is set, the bot posts in that channel:
+
+- `⚠️ Refresh failed for all N users`: no user could be refreshed (Root-Me down, rate
+  limited even through the proxies...). Posted once, not on every refresh.
+- `✅ Refresh works again`: the refresh works again after such a failure.
+- `🛑 Refresh task stopped`: the refresh task crashed; restart the bot.
+
+Failures for a few users only are not reported, they are retried at the next refresh.
+
 # Tests
 ```
 pip install -r requirements-dev.txt
 pytest
 ```
+
+Tests never touch the network: Root-Me, the proxy providers and Discord are faked.
 
 # Commands
 `/register <profile_name>`: Register a Root-me account. The parameter is the profile name from your Root-me URL.

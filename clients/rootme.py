@@ -53,6 +53,7 @@ class RootMeClient:
     BASE_URL = "https://www.root-me.org"
     MAX_RETRIES = 3
     MAX_RETRY_AFTER = 60
+    PROXY_GIVE_UP_PAUSE = 60
     DEFAULT_API_KEYS_FILE = "rootme_api_keys.json"
 
     @staticmethod
@@ -97,7 +98,7 @@ class RootMeClient:
         api_keys = cls.load_api_keys_from_file(file_path)
         return await cls.create(api_keys, proxy_provider)
 
-    def __init__(self, api_keys: List[str], proxy_provider=None):
+    def __init__(self, api_keys: List[str], proxy_provider=None, fallback_proxy_provider=None):
         """
         Initialize RootMeClient.
         
@@ -105,6 +106,8 @@ class RootMeClient:
             api_keys: List of RootMe API keys for rotation
             proxy_provider: Optional proxy provider implementation
                            If None, uses DefaultProxyProvider (no proxies)
+            fallback_proxy_provider: Optional provider used when proxy_provider
+                                     gives no working proxy
         """
         if not isinstance(api_keys, list) or len(api_keys) == 0:
             raise ValueError("api_keys must be a non-empty list of strings")
@@ -115,10 +118,10 @@ class RootMeClient:
         
         # Set up proxy manager
         self.proxy_manager = IndustrialProxy(
-            countries=["GB", "DE", "FR", "CA", "ES", "IT", "BE", "CH", "LU", "NL", "PT"],
+            countries=["FR", "DE", "NL", "GB", "BE", "CH", "LU", "ES", "IT", "PT"],
             protocol="socks5",
-            max_timeout=250,
-            proxy_provider=proxy_provider or DefaultProxyProvider()
+            proxy_provider=proxy_provider or DefaultProxyProvider(),
+            fallback_provider=fallback_proxy_provider
         )
         
         self.client = None
@@ -126,28 +129,21 @@ class RootMeClient:
         self.key_lock = asyncio.Lock()
 
     @classmethod
-    async def create(cls, api_keys: List[str], proxy_provider=None):
+    async def create(cls, api_keys: List[str], proxy_provider=None, fallback_proxy_provider=None):
         """
         Create and initialize a RootMeClient instance.
         
         Args:
             api_keys: List of RootMe API keys
             proxy_provider: Optional proxy provider
+            fallback_proxy_provider: Optional fallback proxy provider
             
         Returns:
             Initialized RootMeClient instance
             
-        Raises:
-            None - Works without proxies if none are available
+        Starts without proxy: proxies are only fetched on the first rate limit.
         """
-        self = cls(api_keys, proxy_provider)
-        
-        # Initialize proxies
-        await self.proxy_manager.get_proxies()
-        
-        if not self.proxy_manager.get_current_proxy():
-            logger.warning("No proxy found! Continuing without proxy.")
-        
+        self = cls(api_keys, proxy_provider, fallback_proxy_provider)
         await self._init_http_client()
         
         return self
@@ -221,8 +217,6 @@ class RootMeClient:
             
             if old_client:
                 await old_client.aclose()
-            
-            await asyncio.sleep(0.5)
 
     async def request(self, method: str, endpoint: str, **kwargs):
         """
@@ -237,23 +231,42 @@ class RootMeClient:
             httpx.Response object
             
         Raises:
-            RootMeRateLimitError: If still rate limited after MAX_RETRIES attempts
+            RootMeRateLimitError: If still rate limited, or MAX_RETRIES proxies
+                failed (then waits PROXY_GIVE_UP_PAUSE first)
         """
         for attempt in range(self.MAX_RETRIES):
-            response = await self.client.request(method, endpoint, **kwargs)
+            try:
+                response = await self.client.request(method, endpoint, **kwargs)
+            except httpx.TransportError as err:
+                if not self.proxy_manager.get_current_proxy():
+                    raise
+                logger.warning(f"Proxy failure on {endpoint}: {err!r}")
+                if attempt < self.MAX_RETRIES - 1:
+                    await self.rotate_proxy("Proxy failure")
+                continue
+
             if response.status_code != 429:
                 return response
 
             retry_after = response.headers.get("Retry-After", "")
             logger.warning(f"Rate limit (429) on {endpoint}, Retry-After: {retry_after!r}")
             pause = int(retry_after) if retry_after.isdigit() else 5 * 2 ** attempt
-            if attempt == self.MAX_RETRIES - 1 or pause > self.MAX_RETRY_AFTER:
+            if attempt == self.MAX_RETRIES - 1:
                 break
 
             if len(self.api_keys) > 1:
                 await self.rotate_api_key("Rate limit (429)")
+            await self.rotate_proxy("Rate limit (429)")
+            if self.proxy_manager.get_current_proxy():
+                continue
+            if pause > self.MAX_RETRY_AFTER:
+                break
             await asyncio.sleep(pause)
 
+        if self.proxy_manager.get_current_proxy():
+            logger.warning(f"{self.MAX_RETRIES} proxies failed, waiting {self.PROXY_GIVE_UP_PAUSE}s")
+            await self.rotate_proxy("Giving up")
+            await asyncio.sleep(self.PROXY_GIVE_UP_PAUSE)
         raise RootMeRateLimitError("Rate limit exceeded")
 
     async def req_get_api(self, endpoint: str, params=None):

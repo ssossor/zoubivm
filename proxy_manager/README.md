@@ -7,7 +7,7 @@
 This module uses the **Strategy Pattern** to provide a flexible way to integrate different proxy providers:
 
 ```
-Client Code (rootmeClient.py)
+Client Code (clients/rootme.py)
     ↓ uses
 Proxy Manager (ZoubiProxy or IndustrialProxy)
     ↓ uses
@@ -15,6 +15,8 @@ Proxy Provider (BaseProxyProvider interface)
     ↓ implemented by
     ├── DefaultProxyProvider → returns empty list (fallback)
     ├── RedScrapeProxyProvider → RedScrape API
+    ├── GeonodeProxyProvider → Geonode free proxy list (used by the bot)
+    ├── ProxyScrapeProxyProvider → ProxyScrape free proxy list (bot fallback)
     └── YourCustomProvider → your implementation
 ```
 
@@ -139,7 +141,8 @@ IndustrialProxy(
     max_timeout=500,
     working_only=True,
     limit=30,
-    proxy_provider=None  # Uses RedScrapeProxyProvider if None
+    proxy_provider=None,  # Uses RedScrapeProxyProvider if None
+    fallback_provider=None  # Used when proxy_provider gives no working proxy
 )
 ```
 
@@ -231,25 +234,17 @@ formatter.to_simple_list(proxies)    # List of "ip:port" strings
 
 ## 🔧 Integration with RootMeClient
 
+`RootMeClient` (`clients/rootme.py`) starts without proxy and only fetches proxies on
+the first rate limit. The bot uses Geonode, with ProxyScrape as fallback:
+
 ```python
-from rootmeClient import RootMeClient
-from proxy_manager import DefaultProxyProvider
+from clients import RootMeClient
+from proxy_manager import GeonodeProxyProvider, ProxyScrapeProxyProvider
 
-# Without proxy
-client = await RootMeClient.create(api_key)
-
-# With custom provider
-from proxy_manager.providers import RedScrapeProxyProvider
 client = await RootMeClient.create(
-    api_key,
-    proxy_provider=RedScrapeProxyProvider()
-)
-
-# With your custom provider
-from proxy_manager.providers.my_provider import MyProxyProvider
-client = await RootMeClient.create(
-    api_key,
-    proxy_provider=MyProxyProvider(api_key="...")
+    api_keys=["key1", "key2"],
+    proxy_provider=GeonodeProxyProvider(),
+    fallback_proxy_provider=ProxyScrapeProxyProvider()
 )
 ```
 
@@ -275,7 +270,9 @@ proxy_manager/
 │   ├── __init__.py
 │   ├── base.py             # BaseProxyProvider + Data Classes
 │   ├── default.py          # DefaultProxyProvider
-│   └── redscrape.py        # RedScrapeProxyProvider
+│   ├── redscrape.py        # RedScrapeProxyProvider
+│   ├── geonode.py          # GeonodeProxyProvider
+│   └── proxyscrape.py      # ProxyScrapeProxyProvider
 ├── utils/
 │   ├── __init__.py
 │   ├── rotator.py          # ProxyRotator

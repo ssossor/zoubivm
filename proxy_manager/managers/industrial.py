@@ -45,7 +45,8 @@ class IndustrialZoubiProxy(BaseProxyManager):
         max_timeout=500,
         working_only=True,
         limit=30,
-        proxy_provider=None
+        proxy_provider=None,
+        fallback_provider=None
     ):
         """
         Initialize IndustrialZoubiProxy.
@@ -58,6 +59,8 @@ class IndustrialZoubiProxy(BaseProxyManager):
             limit: Maximum number of proxies per country
             proxy_provider: A BaseProxyProvider implementation (optional)
                            If None, uses RedScrapeProxyProvider as default
+            fallback_provider: Provider used when the main one gives no working
+                               proxy (optional)
         """
         super().__init__()
         
@@ -81,6 +84,7 @@ class IndustrialZoubiProxy(BaseProxyManager):
         else:
             from ..providers.redscrape import RedScrapeProxyProvider
             self.provider = RedScrapeProxyProvider(timeout=30)
+        self.fallback_provider = fallback_provider
         
         # Initialize utilities
         self.validator = ProxyValidator(
@@ -101,12 +105,12 @@ class IndustrialZoubiProxy(BaseProxyManager):
         )
         return working
     
-    async def get_proxies(self, internal_call=False):
-        """Fetch proxies from the provider and set up rotation."""
+    async def _fetch_working(self, provider: BaseProxyProvider) -> List[ProxyData]:
+        """Fetch proxies from a provider and return the working ones, fastest first."""
         try:
             if self.countries:
                 # Fetch from multiple countries
-                responses = await self.provider.get_multiple_countries(
+                responses = await provider.get_multiple_countries(
                     country_codes=self.countries,
                     filters=self.filters
                 )
@@ -117,22 +121,34 @@ class IndustrialZoubiProxy(BaseProxyManager):
                     self.proxies.extend(response.proxies)
             else:
                 # Fetch all proxies
-                response = await self.provider.get_proxies(self.filters)
+                response = await provider.get_proxies(self.filters)
                 self.proxies = response.proxies
 
             total_proxies = len(self.proxies)
             self.logger.info(f"Got {total_proxies} individual proxies from {len(self.countries) or 'all'} countries")
 
-            if total_proxies > 0:
-                self.logger.info("Selecting only working proxy...")
-                self.proxies = await self._validate_fast()
-                self.logger.info(f"{len(self.proxies)}/{total_proxies} proxies actually work")
-            else:
-                self.logger.warning("No proxies returned from provider. Running without proxies.")
+            if total_proxies == 0:
+                self.logger.warning("No proxies returned from provider.")
+                return []
+
+            self.logger.info("Selecting only working proxy...")
+            working = await self._validate_fast()
+            working.sort(key=lambda p: p.timeout_ms or self.max_timeout)
+            self.logger.info(f"{len(working)}/{total_proxies} proxies actually work")
+            return working
 
         except Exception as e:
-            self.logger.error(f"Error fetching proxies: {e}. Running without proxies.")
-            self.proxies = []
+            self.logger.error(f"Error fetching proxies: {e}.")
+            return []
+
+    async def get_proxies(self, internal_call=False):
+        """Fetch proxies from the provider (or the fallback one) and set up rotation."""
+        self.proxies = await self._fetch_working(self.provider)
+        if not self.proxies and self.fallback_provider is not None:
+            self.logger.warning("No working proxy from the main provider, trying the fallback one...")
+            self.proxies = await self._fetch_working(self.fallback_provider)
+        if not self.proxies:
+            self.logger.warning("No working proxy. Running without proxies.")
 
         # Update rotator with current proxies
         self.rotator = ProxyRotator(self.proxies)
@@ -144,10 +160,6 @@ class IndustrialZoubiProxy(BaseProxyManager):
         else:
             self.current_proxy = None
             self.current_index = 0
-        
-        # Only rotate if this is not an internal call from rotate()
-        if not internal_call:
-            await self.rotate()
     
     async def rotate(self):
         """Move to the next proxy in rotation."""
@@ -176,5 +188,7 @@ class IndustrialZoubiProxy(BaseProxyManager):
                     self.current_index = 0
     
     async def close(self):
-        """Close the provider."""
+        """Close the providers."""
         await self.provider.close()
+        if self.fallback_provider is not None:
+            await self.fallback_provider.close()

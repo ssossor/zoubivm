@@ -1,6 +1,7 @@
 import discord
 import asyncio
 from clients import RootMeClient
+from proxy_manager import GeonodeProxyProvider, ProxyScrapeProxyProvider
 from zoubiClient import ZoubiClient, ChallengesCache
 from discord.ext import commands
 from dotenv import dotenv_values
@@ -32,12 +33,14 @@ else:
 
 DISCORD_TOKEN = config["DISCORD_TOKEN"]
 TARGET_CHANNEL_ID = config["TARGET_CHANNEL_ID"]
+LOG_CHANNEL_ID = config.get("LOG_CHANNEL_ID")
 USERS_LIST_FILE = config["USERS_LIST_FILE"]
 CHALLENGES_CACHE_FILE = os.path.join(os.path.dirname(USERS_LIST_FILE), "challenges.json")
 
 
 class DiscordBot(commands.Bot):
-    def __init__(self, rm_client, zoubi_client, challenges_cache, target_channel_id):
+    def __init__(self, rm_client, zoubi_client, challenges_cache, target_channel_id,
+                 log_channel_id=None):
         intents = discord.Intents.default()
         intents.message_content = True
 
@@ -46,10 +49,12 @@ class DiscordBot(commands.Bot):
         self.zoubi_client = zoubi_client
         self.challenges_cache = challenges_cache
         self.target_channel_id = target_channel_id
+        self.log_channel_id = log_channel_id
 
     async def setup_hook(self):
         await self.add_cog(ZoubiCog(self, self.rm_client, self.zoubi_client,
-                                    self.challenges_cache, self.target_channel_id))
+                                    self.challenges_cache, self.target_channel_id,
+                                    self.log_channel_id))
 
     async def on_ready(self):
         logger.info(f"✅ Bot logged in as {self.user}")
@@ -60,10 +65,13 @@ class DiscordBot(commands.Bot):
 
 async def start_bot():
     logger.info('Initializing clients...')
-    rm_client = await RootMeClient.create(api_keys=api_keys)
+    rm_client = await RootMeClient.create(api_keys=api_keys,
+                                          proxy_provider=GeonodeProxyProvider(),
+                                          fallback_proxy_provider=ProxyScrapeProxyProvider())
     zoubi_client = ZoubiClient(USERS_LIST_FILE)
     challenges_cache = ChallengesCache(CHALLENGES_CACHE_FILE)
-    bot = DiscordBot(rm_client, zoubi_client, challenges_cache, int(TARGET_CHANNEL_ID))
+    bot = DiscordBot(rm_client, zoubi_client, challenges_cache, int(TARGET_CHANNEL_ID),
+                     int(LOG_CHANNEL_ID) if LOG_CHANNEL_ID else None)
 
     logger.info(
         "🚀 Starting ZoubiVM, bip bipb boubpoubp ARM boupbipbbip HELP bipbipbipbipbipbiiiiiiiiiiiiiip")

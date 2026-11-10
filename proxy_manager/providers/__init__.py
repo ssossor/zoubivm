@@ -7,6 +7,8 @@ Each provider implements the BaseProxyProvider interface.
 Available providers:
 - DefaultProxyProvider: Fallback provider (returns empty list)
 - RedScrapeProxyProvider: Provider for RedScrape API
+- GeonodeProxyProvider: Provider for the Geonode free proxy list
+- ProxyScrapeProxyProvider: Provider for the ProxyScrape free proxy list
 
 To add a new provider:
 1. Create a new file in this directory
@@ -23,6 +25,8 @@ from .base import (
 )
 from .default import DefaultProxyProvider
 from .redscrape import RedScrapeProxyProvider
+from .geonode import GeonodeProxyProvider
+from .proxyscrape import ProxyScrapeProxyProvider
 
 __all__ = [
     # Base interface and data classes
@@ -33,4 +37,6 @@ __all__ = [
     # Concrete implementations
     "DefaultProxyProvider",
     "RedScrapeProxyProvider",
+    "GeonodeProxyProvider",
+    "ProxyScrapeProxyProvider",
 ]

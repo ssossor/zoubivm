@@ -85,13 +85,17 @@ class FakeRootMe:
 class FakeChannel:
     def __init__(self):
         self.sent = []
+        self.texts = []
         self.fail_next = 0
 
     async def send(self, content=None, *, embed=None, **_):
         if self.fail_next:
             self.fail_next -= 1
             raise discord.HTTPException(SimpleNamespace(status=503, reason="test"), "fake outage")
-        self.sent.append(embed)
+        if embed is not None:
+            self.sent.append(embed)
+        if content is not None:
+            self.texts.append(content)
 
 
 class FakeInteraction:
@@ -127,6 +131,7 @@ def fake_rootme(authors, monkeypatch) -> FakeRootMe:
     class MockClient(original):
         def __init__(self, *args, **kwargs):
             kwargs["transport"] = httpx.MockTransport(fake.handler)
+            kwargs.pop("proxy", None)
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr(httpx, "AsyncClient", MockClient)
@@ -163,14 +168,19 @@ def channel() -> FakeChannel:
 
 
 @pytest.fixture
-def make_cog(rm_client, users_file, tmp_path, channel):
+def log_channel() -> FakeChannel:
+    return FakeChannel()
+
+
+@pytest.fixture
+def make_cog(rm_client, users_file, tmp_path, channel, log_channel):
     def factory(users: list) -> ZoubiCog:
         with open(users_file, "w") as f:
             json.dump({"users": users}, f)
-        bot = SimpleNamespace(get_channel=lambda _id: channel,
+        bot = SimpleNamespace(get_channel=lambda id_: log_channel if id_ == 43 else channel,
                               tree=SimpleNamespace(sync=None))
         cache = ChallengesCache(str(tmp_path / "challenges.json"))
-        return ZoubiCog(bot, rm_client, ZoubiClient(users_file), cache, 42)
+        return ZoubiCog(bot, rm_client, ZoubiClient(users_file), cache, 42, 43)
 
     return factory
 

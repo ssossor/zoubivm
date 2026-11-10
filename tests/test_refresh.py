@@ -122,3 +122,46 @@ async def test_scheduled_task_survives_outage(make_cog, authors, fake_rootme):
 
     assert len(fake_rootme.paths("/auteurs/")) == len(authors)
     assert running
+
+
+async def test_log_channel_on_total_failure_and_recovery(make_cog, authors, channel,
+                                                         log_channel, fake_rootme):
+    cog = make_cog([stored_user(a) for a in authors])
+    outage = [httpx.ConnectError("fake outage")] * len(authors)
+
+    fake_rootme.inject("/auteurs/", *outage)
+    await cog.refresh()
+    fake_rootme.inject("/auteurs/", *outage)
+    await cog.refresh()
+    await cog.refresh()
+
+    assert len(log_channel.texts) == 2
+    assert log_channel.texts[0].startswith("⚠️ Refresh failed for all 3 users")
+    assert log_channel.texts[1] == "✅ Refresh works again"
+    assert channel.texts == []
+
+
+async def test_partial_failure_is_not_logged(make_cog, authors, log_channel, fake_rootme):
+    cog = make_cog([stored_user(a) for a in authors])
+    fake_rootme.inject("/auteurs/643003", httpx.ConnectError("fake outage"))
+
+    await cog.refresh()
+
+    assert log_channel.texts == []
+
+
+async def test_stopped_task_is_logged(make_cog, log_channel):
+    cog = make_cog([])
+
+    await cog.refresh_error(RuntimeError("boom"))
+
+    assert log_channel.texts == ["🛑 Refresh task stopped: RuntimeError('boom')"]
+
+
+async def test_log_channel_errors_are_swallowed(make_cog, log_channel):
+    cog = make_cog([])
+    log_channel.fail_next = 1
+
+    await cog.send_log("hello")
+
+    assert log_channel.texts == []

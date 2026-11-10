@@ -19,24 +19,28 @@ logger = logging.getLogger(__name__)
 
 class ZoubiCog(commands.Cog):
     def __init__(self, bot, rm_client: RootMeClient, zoubi_client: ZoubiClient,
-                 challenges_cache: ChallengesCache, target_channel_id):
+                 challenges_cache: ChallengesCache, target_channel_id, log_channel_id=None):
         self.bot = bot
         self.rm_client = rm_client
         self.zoubi_client = zoubi_client
         self.challenges_cache = challenges_cache
         self.target_channel_id = target_channel_id
+        self.log_channel_id = log_channel_id
+        self.refresh_failing = False
 
     @tasks.loop(minutes=5)
     async def refresh(self):
         logger.info("Beginning users refresh...")
         all_users = self.zoubi_client.get_all_users()
         new_validations_count = 0
+        failures = []
 
         for user in all_users:
             try:
                 fresh_user_data = await self.rm_client.get_author_from_id(user["id_auteur"])
             except (RootMeApiError, RootMeRateLimitError, httpx.HTTPError) as err:
                 logger.warning(f"Can't refresh {user['nom']}: {err}")
+                failures.append(err)
                 continue
 
             if fresh_user_data["score"] != user["score"]:
@@ -45,6 +49,19 @@ class ZoubiCog(commands.Cog):
             await asyncio.sleep(2)
 
         logger.info(f"Users list refreshed! ({new_validations_count} new validations)")
+
+        failing = bool(all_users) and len(failures) == len(all_users)
+        if failing and not self.refresh_failing:
+            await self.send_log(f"⚠️ Refresh failed for all {len(all_users)} users, "
+                                f"last error: {failures[-1]!r}")
+        elif not failing and self.refresh_failing:
+            await self.send_log("✅ Refresh works again")
+        self.refresh_failing = failing
+
+    @refresh.error
+    async def refresh_error(self, error):
+        logger.error("Refresh task stopped", exc_info=error)
+        await self.send_log(f"🛑 Refresh task stopped: {error!r}")
 
     async def announce_new_validations(self, user, fresh_user_data, all_users) -> int:
         old_ids = {v['id_challenge'] for v in user["validations"]}
@@ -98,6 +115,17 @@ class ZoubiCog(commands.Cog):
         if channel is None:
             channel = await self.bot.fetch_channel(self.target_channel_id)
         await channel.send(embed=embed)
+
+    async def send_log(self, message: str):
+        if self.log_channel_id is None:
+            return
+        try:
+            channel = self.bot.get_channel(self.log_channel_id)
+            if channel is None:
+                channel = await self.bot.fetch_channel(self.log_channel_id)
+            await channel.send(message[:2000])
+        except discord.HTTPException as err:
+            logger.error(f"Can't send to the log channel: {err}")
 
     @app_commands.command(name="ping", description="Test bot connectivity")
     async def ping(self, interaction: discord.Interaction):
