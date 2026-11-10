@@ -52,6 +52,7 @@ class RootMeClient:
     URL = "https://api.www.root-me.org"
     BASE_URL = "https://www.root-me.org"
     MAX_RETRIES = 3
+    MAX_RETRY_AFTER = 60
     DEFAULT_API_KEYS_FILE = "rootme_api_keys.json"
 
     @staticmethod
@@ -243,9 +244,15 @@ class RootMeClient:
             if response.status_code != 429:
                 return response
 
+            retry_after = response.headers.get("Retry-After", "")
+            logger.warning(f"Rate limit (429) on {endpoint}, Retry-After: {retry_after!r}")
+            pause = int(retry_after) if retry_after.isdigit() else 5 * 2 ** attempt
+            if attempt == self.MAX_RETRIES - 1 or pause > self.MAX_RETRY_AFTER:
+                break
+
             if len(self.api_keys) > 1:
                 await self.rotate_api_key("Rate limit (429)")
-            await asyncio.sleep(5 * 2 ** attempt)
+            await asyncio.sleep(pause)
 
         raise RootMeRateLimitError("Rate limit exceeded")
 

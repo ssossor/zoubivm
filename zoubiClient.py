@@ -11,6 +11,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def write_json_file(path: str, data) -> None:
+    """
+    Write data as JSON to path, through a temporary file and an atomic rename.
+
+    Args:
+        path: Destination file
+        data: JSON-serializable data
+    """
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp_path, path)
+
+
 class ZoubiClient:
     users_file = None
     users_list = []
@@ -34,9 +48,7 @@ class ZoubiClient:
         """
         Save self.users_list to the file at self.users_file
         """
-        with open(self.users_file, "w") as f:
-            users_json = {"users": self.users_list}
-            f.write(json.dumps(users_json))
+        write_json_file(self.users_file, {"users": self.users_list})
         logger.info(f"File {self.users_file} saved!")
 
     def list_users(self) -> str:
@@ -101,3 +113,45 @@ class ZoubiClient:
             return deleted_user_data
         except Exception as err:
             raise err
+
+
+class ChallengesCache:
+    """
+    Challenges already fetched from Root-Me, persisted in a JSON file.
+    """
+
+    def __init__(self, cache_file: str):
+        self.cache_file = cache_file
+        self.challenges = {}
+
+        if os.path.exists(cache_file):
+            with open(cache_file, "r") as f:
+                self.challenges = json.load(f)
+        logger.info(f"{len(self.challenges)} challenges loaded from {cache_file}")
+
+    def get(self, challenge_id: str) -> dict | None:
+        """
+        Return cached challenge data, or None if unknown.
+
+        Args:
+            challenge_id: Challenge ID
+
+        Returns:
+            Challenge data or None
+        """
+        return self.challenges.get(challenge_id)
+
+    def add(self, challenge_id: str, chall_data: dict) -> None:
+        """
+        Add a challenge to the cache and save it to self.cache_file.
+
+        Args:
+            challenge_id: Challenge ID
+            chall_data: Challenge data from the API
+        """
+        self.challenges[challenge_id] = {
+            "titre": chall_data["titre"],
+            "score": chall_data["score"],
+            "url_challenge": chall_data["url_challenge"],
+        }
+        write_json_file(self.cache_file, self.challenges)

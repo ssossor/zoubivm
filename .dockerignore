@@ -9,6 +9,7 @@ env
 .venv
 screenshots/
 users.json
+data/
 .env
 .git
 .gitignore

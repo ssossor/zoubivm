@@ -6,7 +6,7 @@ services:
     container_name: zoubivm-bot
     restart: unless-stopped
     volumes:
-      - ./users.json:/app/users.json
+      - ./data:/app/data
       - ./.env:/app/.env:ro
       - ./rootme_api_keys.json:/app/rootme_api_keys.json:ro
     environment:

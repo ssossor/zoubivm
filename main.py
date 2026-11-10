@@ -1,7 +1,7 @@
 import discord
 import asyncio
 from clients import RootMeClient
-from zoubiClient import ZoubiClient
+from zoubiClient import ZoubiClient, ChallengesCache
 from discord.ext import commands
 from dotenv import dotenv_values
 import logging
@@ -33,20 +33,23 @@ else:
 DISCORD_TOKEN = config["DISCORD_TOKEN"]
 TARGET_CHANNEL_ID = config["TARGET_CHANNEL_ID"]
 USERS_LIST_FILE = config["USERS_LIST_FILE"]
+CHALLENGES_CACHE_FILE = os.path.join(os.path.dirname(USERS_LIST_FILE), "challenges.json")
 
 
 class DiscordBot(commands.Bot):
-    def __init__(self, rm_client, zoubi_client, target_channel_id):
+    def __init__(self, rm_client, zoubi_client, challenges_cache, target_channel_id):
         intents = discord.Intents.default()
         intents.message_content = True
 
         super().__init__(command_prefix='!', intents=intents)
         self.rm_client = rm_client
         self.zoubi_client = zoubi_client
+        self.challenges_cache = challenges_cache
         self.target_channel_id = target_channel_id
 
     async def setup_hook(self):
-        await self.add_cog(ZoubiCog(self, self.rm_client, self.zoubi_client, self.target_channel_id))
+        await self.add_cog(ZoubiCog(self, self.rm_client, self.zoubi_client,
+                                    self.challenges_cache, self.target_channel_id))
 
     async def on_ready(self):
         logger.info(f"✅ Bot logged in as {self.user}")
@@ -59,7 +62,8 @@ async def start_bot():
     logger.info('Initializing clients...')
     rm_client = await RootMeClient.create(api_keys=api_keys)
     zoubi_client = ZoubiClient(USERS_LIST_FILE)
-    bot = DiscordBot(rm_client, zoubi_client, int(TARGET_CHANNEL_ID))
+    challenges_cache = ChallengesCache(CHALLENGES_CACHE_FILE)
+    bot = DiscordBot(rm_client, zoubi_client, challenges_cache, int(TARGET_CHANNEL_ID))
 
     logger.info(
         "🚀 Starting ZoubiVM, bip bipb boubpoubp ARM boupbipbbip HELP bipbipbipbipbipbiiiiiiiiiiiiiip")

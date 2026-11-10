@@ -22,7 +22,13 @@ cp rootme_api_keys.example.json rootme_api_keys.json
 ```
 DISCORD_TOKEN=
 TARGET_CHANNEL_ID=
-USERS_LIST_FILE=users.json
+USERS_LIST_FILE=data/users.json
+```
+
+The bot keeps its data (`users.json`, `challenges.json`) in the `data/` folder.
+If you are upgrading from a version that kept `users.json` at the root, move it:
+```
+mkdir -p data && mv users.json data/
 ```
 
 **Optional**: You can specify a custom path for the API keys file:
@@ -44,6 +50,12 @@ pip install -r requirements.txt
 # Starting
 ```
 python main.py
+```
+
+# Tests
+```
+pip install -r requirements-dev.txt
+pytest
 ```
 
 # Commands

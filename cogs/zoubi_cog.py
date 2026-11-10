@@ -3,7 +3,7 @@ from discord import app_commands
 import discord
 from clients import RootMeClient
 from clients.utils import RootMeApiError, RootMeRateLimitError
-from zoubiClient import ZoubiClient
+from zoubiClient import ZoubiClient, ChallengesCache
 import asyncio
 import httpx
 import logging
@@ -18,10 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class ZoubiCog(commands.Cog):
-    def __init__(self, bot, rm_client: RootMeClient, zoubi_client: ZoubiClient, target_channel_id):
+    def __init__(self, bot, rm_client: RootMeClient, zoubi_client: ZoubiClient,
+                 challenges_cache: ChallengesCache, target_channel_id):
         self.bot = bot
         self.rm_client = rm_client
         self.zoubi_client = zoubi_client
+        self.challenges_cache = challenges_cache
         self.target_channel_id = target_channel_id
 
     @tasks.loop(minutes=5)
@@ -55,8 +57,7 @@ class ZoubiCog(commands.Cog):
         announced = 0
         for valid in reversed(new_validations):
             try:
-                chall_data = await self.rm_client.get_chall_from_id(valid['id_challenge'])
-                chall_data = chall_data[0]
+                chall_data = await self.get_challenge(valid['id_challenge'])
 
                 # First blood verification
                 solvers = [
@@ -84,6 +85,13 @@ class ZoubiCog(commands.Cog):
         user.update(fresh_user_data)
         self.zoubi_client.save_users_list_to_file()
         return announced
+
+    async def get_challenge(self, challenge_id: str) -> dict:
+        chall_data = self.challenges_cache.get(challenge_id)
+        if chall_data is None:
+            chall_data = (await self.rm_client.get_chall_from_id(challenge_id))[0]
+            self.challenges_cache.add(challenge_id, chall_data)
+        return chall_data
 
     async def send_to_target_channel(self, embed: discord.Embed):
         channel = self.bot.get_channel(self.target_channel_id)
