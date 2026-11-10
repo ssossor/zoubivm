@@ -70,7 +70,7 @@ The bot refreshes every registered user every 5 minutes through the Root-Me API.
 
 - It starts on its own IP, without any proxy.
 - On a rate limit (HTTP 429), it switches to the next API key and to free European
-  SOCKS5 proxies: it fetches them from [Geonode](https://geonode.com/free-proxy-list)
+  SOCKS5 proxies (a connection failure switches to the proxies too): it fetches them from [Geonode](https://geonode.com/free-proxy-list)
   (uptime >= 90 %), tests them and uses the fastest one.
   [ProxyScrape](https://proxyscrape.com/free-proxy-list) is used as a fallback when
   Geonode gives no working proxy.

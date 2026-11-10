@@ -2,7 +2,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import discord
 from clients import RootMeClient
-from clients.utils import RootMeApiError, RootMeRateLimitError
+from clients.utils import RootMeApiError, RootMeRateLimitError, describe_error
 from zoubiClient import ZoubiClient, ChallengesCache
 import asyncio
 import httpx
@@ -39,7 +39,7 @@ class ZoubiCog(commands.Cog):
             try:
                 fresh_user_data = await self.rm_client.get_author_from_id(user["id_auteur"])
             except (RootMeApiError, RootMeRateLimitError, httpx.HTTPError) as err:
-                logger.warning(f"Can't refresh {user['nom']}: {err}")
+                logger.warning(f"Can't refresh {user['nom']}: {describe_error(err)}")
                 failures.append(err)
                 continue
 
@@ -53,7 +53,7 @@ class ZoubiCog(commands.Cog):
         failing = bool(all_users) and len(failures) == len(all_users)
         if failing and not self.refresh_failing:
             await self.send_log(f"⚠️ Refresh failed for all {len(all_users)} users, "
-                                f"last error: {failures[-1]!r}")
+                                f"last error: {describe_error(failures[-1])}")
         elif not failing and self.refresh_failing:
             await self.send_log("✅ Refresh works again")
         self.refresh_failing = failing
@@ -91,7 +91,7 @@ class ZoubiCog(commands.Cog):
                     fresh_user_data, valid, chall_data, is_first_blood)
                 await self.send_to_target_channel(validation_embed)
             except (RootMeApiError, RootMeRateLimitError, httpx.HTTPError, discord.HTTPException) as err:
-                logger.warning(f"Can't announce {valid['titre']} for {user['nom']}, retrying next refresh: {err}")
+                logger.warning(f"Can't announce {valid['titre']} for {user['nom']}, retrying next refresh: {describe_error(err)}")
                 return announced
 
             user["validations"].insert(0, valid)

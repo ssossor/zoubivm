@@ -8,7 +8,7 @@ import os
 from typing import List, Optional
 
 from proxy_manager import IndustrialProxy, DefaultProxyProvider
-from .utils import RootMeApiError, RootMeRateLimitError
+from .utils import RootMeApiError, RootMeRateLimitError, describe_error
 
 logging.basicConfig(
     level=logging.INFO,
@@ -233,16 +233,17 @@ class RootMeClient:
         Raises:
             RootMeRateLimitError: If still rate limited, or MAX_RETRIES proxies
                 failed (then waits PROXY_GIVE_UP_PAUSE first)
+            httpx.TransportError: If Root-Me can't be reached and no proxy works
         """
         for attempt in range(self.MAX_RETRIES):
             try:
                 response = await self.client.request(method, endpoint, **kwargs)
             except httpx.TransportError as err:
+                logger.warning(f"Connection failure on {endpoint}: {describe_error(err)}")
+                if attempt < self.MAX_RETRIES - 1:
+                    await self.rotate_proxy("Connection failure")
                 if not self.proxy_manager.get_current_proxy():
                     raise
-                logger.warning(f"Proxy failure on {endpoint}: {err!r}")
-                if attempt < self.MAX_RETRIES - 1:
-                    await self.rotate_proxy("Proxy failure")
                 continue
 
             if response.status_code != 429:
@@ -267,7 +268,7 @@ class RootMeClient:
             logger.warning(f"{self.MAX_RETRIES} proxies failed, waiting {self.PROXY_GIVE_UP_PAUSE}s")
             await self.rotate_proxy("Giving up")
             await asyncio.sleep(self.PROXY_GIVE_UP_PAUSE)
-        raise RootMeRateLimitError("Rate limit exceeded")
+        raise RootMeRateLimitError("Rate limit exceeded or no working proxy")
 
     async def req_get_api(self, endpoint: str, params=None):
         """

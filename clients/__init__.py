@@ -8,10 +8,11 @@ Available clients:
 """
 
 from .rootme import RootMeClient
-from .utils import RootMeApiError, RootMeRateLimitError
+from .utils import RootMeApiError, RootMeRateLimitError, describe_error
 
 __all__ = [
     "RootMeClient",
     "RootMeApiError", 
     "RootMeRateLimitError",
+    "describe_error",
 ]

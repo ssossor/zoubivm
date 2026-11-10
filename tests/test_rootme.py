@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from clients import RootMeClient, RootMeRateLimitError
+from clients import RootMeClient, RootMeRateLimitError, describe_error
 from proxy_manager import ProxyData, ProxyResponse, ProxyValidator
 
 
@@ -149,3 +149,35 @@ async def test_fallback_provider_when_main_has_no_proxy(fake_rootme, sleeps, pro
 
     assert (empty.fetches, provider.fetches) == (1, 1)
     assert current_address(client) == "10.0.0.1"
+
+
+async def test_connection_failure_switches_to_best_proxy(proxied_client, provider,
+                                                         fake_rootme, sleeps):
+    fake_rootme.inject("/challenges/", httpx.ConnectError(""))
+
+    data = await proxied_client.get_chall_from_id("85")
+
+    assert data[0]["titre"] == "Challenge 85"
+    assert provider.fetches == 1
+    assert current_address(proxied_client) == "10.0.0.1"
+    assert sleeps == []
+
+
+async def test_connection_failure_without_proxy_raises(rm_client, fake_rootme):
+    fake_rootme.inject("/challenges/", httpx.ConnectError("down"))
+
+    with pytest.raises(httpx.ConnectError):
+        await rm_client.get_chall_from_id("85")
+    assert len(fake_rootme.paths("/challenges/")) == 1
+
+
+def test_describe_error_shows_hidden_cause():
+    try:
+        try:
+            raise ConnectionResetError(104, "Connection reset by peer")
+        except ConnectionResetError as cause:
+            raise httpx.ConnectError("") from cause
+    except httpx.ConnectError as err:
+        description = describe_error(err)
+
+    assert description == "ConnectError('') <- ConnectionResetError(104, 'Connection reset by peer')"
