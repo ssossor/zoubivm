@@ -8,7 +8,11 @@ This system allows the ZoubiVM bot to rotate through multiple RootMe API keys wh
 
 ### Option 1: Using a JSON File (Recommended)
 
-Create a file named `rootme_api_keys.json` in the project root with your API keys:
+Copy `rootme_api_keys.example.json` to `rootme_api_keys.json` in the project root and fill it with your API keys:
+
+```
+cp rootme_api_keys.example.json rootme_api_keys.json
+```
 
 ```json
 [
@@ -60,7 +64,7 @@ Where `2/3` indicates the current key index out of the total number of keys.
 
 ## Security
 
-The `rootme_api_keys.json` file is automatically added to `.gitignore` to prevent accidental commitment of API keys to version control.
+The `rootme_api_keys.json` file is listed in `.gitignore` and `.dockerignore`: it is never committed nor baked into the Docker image. With Docker Compose, it is mounted read-only into the container at runtime.
 
 ## Code Usage
 

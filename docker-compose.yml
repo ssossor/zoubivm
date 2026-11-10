@@ -8,6 +8,7 @@ services:
     volumes:
       - ./users.json:/app/users.json
       - ./.env:/app/.env:ro
+      - ./rootme_api_keys.json:/app/rootme_api_keys.json:ro
     environment:
       - PYTHONUNBUFFERED=1
     stdin_open: true

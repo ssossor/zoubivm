@@ -1,7 +1,11 @@
 # Installation
 
 ### 1. Create API Keys File
-Create a `rootme_api_keys.json` file in the project root with your RootMe API keys:
+Copy the example file and fill it with your RootMe API keys:
+
+```
+cp rootme_api_keys.example.json rootme_api_keys.json
+```
 
 ```json
 [
