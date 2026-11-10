@@ -7,14 +7,8 @@ import json
 import os
 from typing import List, Optional
 
-from playwright.async_api import async_playwright
 from proxy_manager import IndustrialProxy, DefaultProxyProvider
-from .utils import (
-    scrape_user_id_from_profile,
-    scrape_user_points_from_profile,
-    RootMeApiError,
-    RootMeRateLimitError,
-)
+from .utils import RootMeApiError, RootMeRateLimitError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -242,17 +236,18 @@ class RootMeClient:
             httpx.Response object
             
         Raises:
-            RootMeRateLimitError: If rate limited
+            RootMeRateLimitError: If still rate limited after MAX_RETRIES attempts
         """
-        response = await self.client.request(method, endpoint, **kwargs)
-        
-        if response.status_code == 429:
-            # Try to rotate API key if multiple keys are available
+        for attempt in range(self.MAX_RETRIES):
+            response = await self.client.request(method, endpoint, **kwargs)
+            if response.status_code != 429:
+                return response
+
             if len(self.api_keys) > 1:
                 await self.rotate_api_key("Rate limit (429)")
-            raise RootMeRateLimitError("Rate limit exceeded")
-        
-        return response
+            await asyncio.sleep(5 * 2 ** attempt)
+
+        raise RootMeRateLimitError("Rate limit exceeded")
 
     async def req_get_api(self, endpoint: str, params=None):
         """
@@ -272,65 +267,29 @@ class RootMeClient:
         
         return response
 
-    async def get_user_id_from_headless(self, profile_id: str) -> str:
+    async def get_user_id(self, profile_id: str) -> Optional[str]:
         """
-        Get user ID by scraping the profile page with a headless browser.
-        
+        Get user ID from a profile name, as found in the profile URL.
+
         Args:
-            profile_id: Profile ID to scrape
-            
+            profile_id: Profile name (e.g. "Ssor" or "Aube-643003")
+
         Returns:
             User ID as string or None if not found
         """
-        async with async_playwright() as p:
-            browser = await p.firefox.launch()
-            try:
-                user_id = await scrape_user_id_from_profile(
-                    browser,
-                    profile_id,
-                    screenshot_path='screenshots/debug_register.png'
-                )
-                return user_id
-            finally:
-                await browser.close()
+        name, _, suffix = profile_id.rpartition("-")
+        if name and suffix.isnumeric():
+            return suffix
 
-    async def get_user_points_headless(self, profile_id: str, page) -> str:
-        """
-        Get user points by scraping the profile page.
-        
-        Args:
-            profile_id: Profile ID to scrape
-            page: Playwright page instance
-            
-        Returns:
-            Points as string or None if not found
-            
-        Raises:
-            RootMeRateLimitError: If rate limited
-            Exception: On other errors
-        """
         try:
-            points = await scrape_user_points_from_profile(
-                page,
-                profile_id,
-                screenshot_path="screenshots/get_user_points.png"
-            )
-            return points
-        except Exception as e:
-            error_msg = str(e).lower()
-            proxy_errors = [
-                "err_proxy_connection_failed",
-                "err_connection_reset",
-                "err_tunnel_connection_failed",
-                "ssl_error",
-                "timeout"
-            ]
-            
-            if any(err in error_msg for err in proxy_errors):
-                logger.warning(f"Proxy error detected: {e}")
-                raise RootMeRateLimitError(f"Proxy Failure: {e}")
-            
-            raise e
+            authors = await self.get_authors_from_username({"nom": profile_id})
+        except RootMeApiError:
+            return None
+
+        for author in authors[0].values() if authors else []:
+            if author["nom"] == profile_id:
+                return author["id_auteur"]
+        return None
 
     async def get_challs(self) -> dict:
         """

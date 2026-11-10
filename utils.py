@@ -101,9 +101,24 @@ def get_leaderboard_embed(users_list: list) -> discord.Embed:
         else:
             prefix = emojis[i] if i < len(emojis) else str(i + 1)
 
-        description += f"{prefix} **{user['username']}** ({user['points']} points)\n"
+        line = f"{prefix} **{user['username']}** ({user['points']} points)\n"
+        if len(description) + len(line) > 4096:
+            break
+        description += line
 
     embed = discord.Embed(title="Leaderboard",
                           description=description, colour=0x00b0f4)
 
     return embed
+
+
+def split_message(text: str, limit: int = 2000) -> list:
+    """
+    Split a message by lines to fit in Discord's message length limit
+    """
+    chunks = [""]
+    for line in text.split("\n"):
+        if len(chunks[-1]) + len(line) + 1 > limit:
+            chunks.append("")
+        chunks[-1] += line + "\n"
+    return chunks

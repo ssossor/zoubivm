@@ -39,7 +39,6 @@ And enable the following option for the bot:
 Then run:
 ```
 pip install -r requirements.txt
-playwright install
 ```
 
 # Starting

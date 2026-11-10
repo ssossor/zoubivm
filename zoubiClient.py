@@ -54,6 +54,15 @@ class ZoubiClient:
                 return user
         return None
 
+    def get_user_from_id(self, user_id: str) -> dict:
+        """
+        Return user data from its ID
+        """
+        for user in self.users_list:
+            if user["id_auteur"] == user_id:
+                return user
+        return None
+
     def get_all_users(self):
         """
         Return all registered users data
