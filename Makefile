@@ -85,7 +85,7 @@ init-env: ## Create .env file from example
 	@echo "$(BLUE)[Config]$(NC) Creating .env file..."
 	@if [ ! -f .env ]; then \
 		cp .env.example .env 2>/dev/null || \
-		printf 'DISCORD_TOKEN=\nROOT_ME_API_KEY=\nTARGET_CHANNEL_ID=\nUSERS_LIST_FILE=users.json\n' > .env; \
+		printf 'DISCORD_TOKEN=\nTARGET_CHANNEL_ID=\nUSERS_LIST_FILE=users.json\n' > .env; \
 	fi
 	@echo "$(GREEN)[OK]$(NC) .env file created. Edit it before starting."
 
