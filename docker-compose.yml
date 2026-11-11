@@ -11,5 +11,13 @@ services:
       - ./rootme_api_keys.json:/app/rootme_api_keys.json:ro
     environment:
       - PYTHONUNBUFFERED=1
+    depends_on:
+      - tor
     stdin_open: true
     tty: true
+
+  tor:
+    build:
+      context: ./tor
+    container_name: zoubivm-tor
+    restart: unless-stopped

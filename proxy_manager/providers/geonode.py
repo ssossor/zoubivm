@@ -4,7 +4,8 @@ import logging
 import httpx
 from typing import Optional, Union
 
-from .base import BaseProxyProvider, ProxyFilter, ProxyResponse, ProxyData
+from .base import (BaseProxyProvider, ProxyFilter, ProxyResponse, ProxyData,
+                   filter_params, wanted_protocols)
 
 logger = logging.getLogger("proxy_manager.geonode_provider")
 
@@ -39,14 +40,12 @@ class GeonodeProxyProvider(BaseProxyProvider):
         Fetch proxies from the Geonode API.
 
         Args:
-            filters: Filtering options (country, protocol, limit)
+            filters: Filtering options (country, protocols, limit)
 
         Returns:
             ProxyResponse containing the proxies from Geonode
         """
-        if isinstance(filters, ProxyFilter):
-            filters = filters.to_params()
-        filters = filters or {}
+        filters = filter_params(filters)
 
         params = {
             "limit": filters.get("limit", 100),
@@ -68,11 +67,10 @@ class GeonodeProxyProvider(BaseProxyProvider):
             logger.error(f"Error fetching from Geonode: {e!r}")
             return ProxyResponse(proxies=[], total_count=0, filters_applied=params)
 
+        wanted = wanted_protocols(filters)
         proxies = []
         for item in data:
-            protocol = filters.get("protocol")
-            if protocol not in item["protocols"]:
-                protocol = item["protocols"][0]
+            protocol = next((p for p in wanted if p in item["protocols"]), item["protocols"][0])
             proxies.append(ProxyData(
                 address=item["ip"],
                 port=int(item["port"]),
@@ -99,9 +97,7 @@ class GeonodeProxyProvider(BaseProxyProvider):
         Returns:
             ProxyResponse containing proxies from the specified country
         """
-        if isinstance(filters, ProxyFilter):
-            filters = filters.to_params()
-        return await self.get_proxies({**(filters or {}), "country": country_code})
+        return await self.get_proxies({**filter_params(filters), "country": country_code})
 
     async def close(self):
         """Close the HTTP client."""

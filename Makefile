@@ -85,7 +85,7 @@ init-env: ## Create .env file from example
 	@echo "$(BLUE)[Config]$(NC) Creating .env file..."
 	@if [ ! -f .env ]; then \
 		cp .env.example .env 2>/dev/null || \
-		printf 'DISCORD_TOKEN=\nTARGET_CHANNEL_ID=\nLOG_CHANNEL_ID=\nUSERS_LIST_FILE=data/users.json\n' > .env; \
+		printf 'DISCORD_TOKEN=\nTARGET_CHANNEL_ID=\nLOG_CHANNEL_ID=\nUSERS_LIST_FILE=data/users.json\nTOR_PROXY=socks5://tor:9050\n' > .env; \
 	fi
 	@echo "$(GREEN)[OK]$(NC) .env file created. Edit it before starting."
 

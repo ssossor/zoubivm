@@ -17,6 +17,9 @@ Proxy Provider (BaseProxyProvider interface)
     ├── RedScrapeProxyProvider → RedScrape API
     ├── GeonodeProxyProvider → Geonode free proxy list (used by the bot)
     ├── ProxyScrapeProxyProvider → ProxyScrape free proxy list (bot fallback)
+    ├── TorProxyProvider → Tor SOCKS proxy, one circuit per proxy (used first by the bot)
+    ├── StormsiaProxyProvider → stormsia free proxy list (bot fallback)
+    ├── ProxiflyProxyProvider → Proxifly free proxy list (bot fallback)
     └── YourCustomProvider → your implementation
 ```
 
@@ -142,7 +145,8 @@ IndustrialProxy(
     working_only=True,
     limit=30,
     proxy_provider=None,  # Uses RedScrapeProxyProvider if None
-    fallback_provider=None  # Used when proxy_provider gives no working proxy
+    fallback_providers=None,  # Tried in order when proxy_provider gives no working proxy
+    test_url="https://httpbin.org/ip"  # URL a proxy must reach to be kept
 )
 ```
 
@@ -235,18 +239,28 @@ formatter.to_simple_list(proxies)    # List of "ip:port" strings
 ## 🔧 Integration with RootMeClient
 
 `RootMeClient` (`clients/rootme.py`) starts without proxy and only fetches proxies on
-the first rate limit. The bot uses Geonode, with ProxyScrape as fallback:
+the first rate limit. It asks for SOCKS5 and HTTP(S) proxies (`protocol="socks5,http,https"`)
+and the bot uses Tor, then Geonode, stormsia, ProxyScrape and Proxifly:
 
 ```python
 from clients import RootMeClient
-from proxy_manager import GeonodeProxyProvider, ProxyScrapeProxyProvider
+from proxy_manager import (GeonodeProxyProvider, ProxiflyProxyProvider, ProxyScrapeProxyProvider,
+                           StormsiaProxyProvider, TorProxyProvider)
 
 client = await RootMeClient.create(
     api_keys=["key1", "key2"],
-    proxy_provider=GeonodeProxyProvider(),
-    fallback_proxy_provider=ProxyScrapeProxyProvider()
+    proxy_provider=TorProxyProvider("socks5://tor:9050"),
+    fallback_proxy_providers=[GeonodeProxyProvider(), StormsiaProxyProvider(),
+                              ProxyScrapeProxyProvider(), ProxiflyProxyProvider()]
 )
 ```
+
+A provider reads `filters` with `filter_params()` and the asked protocols, in order of
+preference, with `wanted_protocols()`. An "https" proxy is an HTTP proxy that tunnels
+HTTPS: `ProxyData.url` gives it an `http://` URL.
+
+`TorProxyProvider` gives each proxy random SOCKS credentials: Tor isolates streams by
+credentials, so each proxy gets its own circuit, and every fetch gives new circuits.
 
 ## 🎓 Best Practices
 
@@ -272,7 +286,10 @@ proxy_manager/
 │   ├── default.py          # DefaultProxyProvider
 │   ├── redscrape.py        # RedScrapeProxyProvider
 │   ├── geonode.py          # GeonodeProxyProvider
-│   └── proxyscrape.py      # ProxyScrapeProxyProvider
+│   ├── proxyscrape.py      # ProxyScrapeProxyProvider
+│   ├── stormsia.py         # StormsiaProxyProvider
+│   ├── proxifly.py         # ProxiflyProxyProvider
+│   └── tor.py              # TorProxyProvider
 ├── utils/
 │   ├── __init__.py
 │   ├── rotator.py          # ProxyRotator

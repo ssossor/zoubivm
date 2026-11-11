@@ -24,11 +24,16 @@ DISCORD_TOKEN=
 TARGET_CHANNEL_ID=
 LOG_CHANNEL_ID=
 USERS_LIST_FILE=data/users.json
+TOR_PROXY=socks5://tor:9050
 ```
 
 - `TARGET_CHANNEL_ID`: channel where new validations are announced.
 - `LOG_CHANNEL_ID` (optional): channel where the bot reports serious problems (see
   [Log channel](#log-channel)). Leave it empty to disable it.
+- `TOR_PROXY` (optional): Tor SOCKS proxy used first when Root-Me can't be reached
+  (see [Root-Me rate limits and proxies](#root-me-rate-limits-and-proxies)).
+  `socks5://tor:9050` is the Tor container started by Docker Compose. Leave it empty
+  to use free proxies only.
 
 The bot keeps its data (`users.json`, `challenges.json`) in the `data/` folder.
 If you are upgrading from a version that kept `users.json` at the root, move it:
@@ -69,15 +74,27 @@ make down    # stop
 The bot refreshes every registered user every 5 minutes through the Root-Me API.
 
 - It starts on its own IP, without any proxy.
-- On a rate limit (HTTP 429), it switches to the next API key and to free European
-  SOCKS5 proxies (a connection failure switches to the proxies too): it fetches them from [Geonode](https://geonode.com/free-proxy-list)
-  (uptime >= 90 %), tests them and uses the fastest one.
-  [ProxyScrape](https://proxyscrape.com/free-proxy-list) is used as a fallback when
-  Geonode gives no working proxy.
+- On a rate limit (HTTP 429), it switches to the next API key and to proxies (a
+  connection failure switches to the proxies too). Proxies are tested against
+  Root-Me and the fastest one is used. They come from the first source giving a
+  working one:
+  1. Tor, when `TOR_PROXY` is set: 5 circuits, each one usually with its own exit IP.
+  2. [Geonode](https://geonode.com/free-proxy-list) (uptime >= 90 %).
+  3. [stormsia](https://stormsia.github.io/proxy-list) (re-validated every 15 min).
+  4. [ProxyScrape](https://proxyscrape.com/free-proxy-list).
+  5. [Proxifly](https://github.com/proxifly/free-proxy-list) (largest list, random
+     sample).
+
+  Free proxies are European SOCKS5 and HTTP(S) proxies. Through an HTTP proxy, HTTPS
+  requests go through a CONNECT tunnel: the proxy never sees the API keys.
 - When a proxy fails or is rate limited, it moves to the next one. After 3 failed
   attempts, it gives up on the request, waits 60 s and goes on with the next user.
-- When every proxy has been used, a new list is fetched. If no proxy works, the bot
-  stays on its own IP and waits as asked by Root-Me (`Retry-After`).
+- When every proxy has been used, a new list is fetched (with Tor: new circuits). If
+  no proxy works, the bot stays on its own IP and waits as asked by Root-Me
+  (`Retry-After`).
+
+Docker Compose starts a `tor` container next to the bot (`tor/`). Its SOCKS port is
+only reachable from the Compose network, it is not published on the host.
 
 See [proxy_manager/README.md](proxy_manager/README.md) to add another proxy provider.
 

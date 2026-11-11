@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Union
 from dataclasses import dataclass, field
 from datetime import datetime
+from urllib.parse import quote
 
 
 @dataclass
@@ -18,12 +19,22 @@ class ProxyData:
     timeout_ms: Optional[int] = None
     is_working: bool = True
     last_checked: Optional[datetime] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
     
     @property
     def url(self) -> str:
-        """Return the proxy URL in the format protocol://address:port."""
-        prefix = "socks5" if self.protocol == "socks5" else self.protocol
-        return f"{prefix}://{self.address}:{self.port}"
+        """
+        Return the proxy URL in the format protocol://[user:password@]address:port.
+
+        An "https" proxy is an HTTP proxy that tunnels HTTPS (CONNECT): it is reached
+        with http://.
+        """
+        prefix = "http" if self.protocol == "https" else self.protocol
+        auth = ""
+        if self.username:
+            auth = f"{quote(self.username, safe='')}:{quote(self.password or '', safe='')}@"
+        return f"{prefix}://{auth}{self.address}:{self.port}"
     
     def to_dict(self) -> dict:
         """Return a dictionary representation for requests library."""
@@ -33,12 +44,12 @@ class ProxyData:
         }
     
     def __repr__(self):
-        return f"<Proxy {self.url} ({self.country_code or 'Unknown'}]>"
+        return f"<Proxy {self.protocol}://{self.address}:{self.port} ({self.country_code or 'Unknown'}]>"
 
 
 @dataclass 
 class ProxyFilter:
-    """Filter options for proxy requests."""
+    """Filter options for proxy requests. `protocol` may list several protocols: "socks5,http"."""
     country: Optional[str] = None
     protocol: Optional[str] = None
     max_timeout: Optional[int] = None
@@ -81,6 +92,34 @@ class ProxyResponse:
     
     def __getitem__(self, index):
         return self.proxies[index]
+
+
+def filter_params(filters: Optional[Union[ProxyFilter, dict]]) -> dict:
+    """
+    Return filters as a dict, whether given as a ProxyFilter, a dict or None.
+
+    Args:
+        filters: Filtering options
+
+    Returns:
+        Filters as a dict (empty if None)
+    """
+    if isinstance(filters, ProxyFilter):
+        return filters.to_params()
+    return dict(filters or {})
+
+
+def wanted_protocols(filters: dict) -> List[str]:
+    """
+    Return the protocols asked in filters, in order of preference.
+
+    Args:
+        filters: Filters as a dict, with "protocol" like "socks5,http,https"
+
+    Returns:
+        List of protocols, empty if any protocol is accepted
+    """
+    return [p for p in filters.get("protocol", "").split(",") if p]
 
 
 class BaseProxyProvider(ABC):

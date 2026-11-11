@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from typing import List, Optional
 import aiohttp
 from aiohttp_socks import ProxyConnector
@@ -78,7 +79,8 @@ class ProxyValidator:
             max_concurrent: Maximum number of concurrent validation requests
             
         Returns:
-            List of working ProxyData objects
+            List of working ProxyData objects, with timeout_ms set to the
+            measured response time
         """
         if not proxies:
             return []
@@ -88,8 +90,11 @@ class ProxyValidator:
             
             async def validate_with_semaphore(proxy: ProxyData) -> Optional[ProxyData]:
                 async with semaphore:
-                    is_working = await self.validate_proxy(proxy, http_session)
-                    return proxy if is_working else None
+                    start = time.monotonic()
+                    if not await self.validate_proxy(proxy, http_session):
+                        return None
+                    proxy.timeout_ms = round((time.monotonic() - start) * 1000)
+                    return proxy
             
             tasks = [validate_with_semaphore(proxy) for proxy in proxies]
             results = await asyncio.gather(*tasks, return_exceptions=True)

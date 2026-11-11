@@ -4,7 +4,7 @@ import logging
 import httpx
 from typing import Optional, Union
 
-from .base import BaseProxyProvider, ProxyFilter, ProxyResponse, ProxyData
+from .base import BaseProxyProvider, ProxyFilter, ProxyResponse, ProxyData, filter_params
 
 logger = logging.getLogger("proxy_manager.proxyscrape_provider")
 
@@ -38,14 +38,12 @@ class ProxyScrapeProxyProvider(BaseProxyProvider):
         Fetch proxies from the ProxyScrape API.
 
         Args:
-            filters: Filtering options (country, protocol, limit)
+            filters: Filtering options (country, protocols, limit)
 
         Returns:
             ProxyResponse containing the proxies from ProxyScrape
         """
-        if isinstance(filters, ProxyFilter):
-            filters = filters.to_params()
-        filters = filters or {}
+        filters = filter_params(filters)
 
         params = {"request": "display_proxies", "format": "json"}
         for key in ("country", "protocol", "limit"):
@@ -90,9 +88,7 @@ class ProxyScrapeProxyProvider(BaseProxyProvider):
         Returns:
             ProxyResponse containing proxies from the specified country
         """
-        if isinstance(filters, ProxyFilter):
-            filters = filters.to_params()
-        return await self.get_proxies({**(filters or {}), "country": country_code})
+        return await self.get_proxies({**filter_params(filters), "country": country_code})
 
     async def close(self):
         """Close the HTTP client."""

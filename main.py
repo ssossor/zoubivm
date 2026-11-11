@@ -1,7 +1,8 @@
 import discord
 import asyncio
 from clients import RootMeClient
-from proxy_manager import GeonodeProxyProvider, ProxyScrapeProxyProvider
+from proxy_manager import (GeonodeProxyProvider, ProxiflyProxyProvider, ProxyScrapeProxyProvider,
+                           StormsiaProxyProvider, TorProxyProvider)
 from zoubiClient import ZoubiClient, ChallengesCache
 from discord.ext import commands
 from dotenv import dotenv_values
@@ -34,6 +35,7 @@ else:
 DISCORD_TOKEN = config["DISCORD_TOKEN"]
 TARGET_CHANNEL_ID = config["TARGET_CHANNEL_ID"]
 LOG_CHANNEL_ID = config.get("LOG_CHANNEL_ID")
+TOR_PROXY = config.get("TOR_PROXY")
 USERS_LIST_FILE = config["USERS_LIST_FILE"]
 CHALLENGES_CACHE_FILE = os.path.join(os.path.dirname(USERS_LIST_FILE), "challenges.json")
 
@@ -65,9 +67,13 @@ class DiscordBot(commands.Bot):
 
 async def start_bot():
     logger.info('Initializing clients...')
+    proxy_providers = [GeonodeProxyProvider(), StormsiaProxyProvider(),
+                       ProxyScrapeProxyProvider(), ProxiflyProxyProvider()]
+    if TOR_PROXY:
+        proxy_providers.insert(0, TorProxyProvider(TOR_PROXY))
     rm_client = await RootMeClient.create(api_keys=api_keys,
-                                          proxy_provider=GeonodeProxyProvider(),
-                                          fallback_proxy_provider=ProxyScrapeProxyProvider())
+                                          proxy_provider=proxy_providers[0],
+                                          fallback_proxy_providers=proxy_providers[1:])
     zoubi_client = ZoubiClient(USERS_LIST_FILE)
     challenges_cache = ChallengesCache(CHALLENGES_CACHE_FILE)
     bot = DiscordBot(rm_client, zoubi_client, challenges_cache, int(TARGET_CHANNEL_ID),

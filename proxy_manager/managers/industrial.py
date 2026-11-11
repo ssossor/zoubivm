@@ -46,21 +46,23 @@ class IndustrialZoubiProxy(BaseProxyManager):
         working_only=True,
         limit=30,
         proxy_provider=None,
-        fallback_provider=None
+        fallback_providers=None,
+        test_url="https://httpbin.org/ip"
     ):
         """
         Initialize IndustrialZoubiProxy.
         
         Args:
             countries: List of country codes to fetch proxies from
-            protocol: Proxy protocol (http, socks5, etc.)
+            protocol: Proxy protocol, or several comma-separated ("socks5,http")
             max_timeout: Maximum timeout in milliseconds
             working_only: Only use proxies marked as working
             limit: Maximum number of proxies per country
             proxy_provider: A BaseProxyProvider implementation (optional)
                            If None, uses RedScrapeProxyProvider as default
-            fallback_provider: Provider used when the main one gives no working
-                               proxy (optional)
+            fallback_providers: Providers tried in order when the main one gives
+                                no working proxy (optional)
+            test_url: URL a proxy must reach to be considered working
         """
         super().__init__()
         
@@ -84,12 +86,12 @@ class IndustrialZoubiProxy(BaseProxyManager):
         else:
             from ..providers.redscrape import RedScrapeProxyProvider
             self.provider = RedScrapeProxyProvider(timeout=30)
-        self.fallback_provider = fallback_provider
+        self.fallback_providers = fallback_providers or []
         
         # Initialize utilities
         self.validator = ProxyValidator(
             timeout=10,
-            test_url="https://httpbin.org/ip"
+            test_url=test_url
         )
         self.rotator = ProxyRotator(self.proxies)
         self.current_index = 0
@@ -142,12 +144,13 @@ class IndustrialZoubiProxy(BaseProxyManager):
             return []
 
     async def get_proxies(self, internal_call=False):
-        """Fetch proxies from the provider (or the fallback one) and set up rotation."""
-        self.proxies = await self._fetch_working(self.provider)
-        if not self.proxies and self.fallback_provider is not None:
-            self.logger.warning("No working proxy from the main provider, trying the fallback one...")
-            self.proxies = await self._fetch_working(self.fallback_provider)
-        if not self.proxies:
+        """Fetch proxies from the first provider giving a working one and set up rotation."""
+        for provider in [self.provider, *self.fallback_providers]:
+            self.proxies = await self._fetch_working(provider)
+            if self.proxies:
+                break
+            self.logger.warning(f"No working proxy from {type(provider).__name__}")
+        else:
             self.logger.warning("No working proxy. Running without proxies.")
 
         # Update rotator with current proxies
@@ -189,6 +192,5 @@ class IndustrialZoubiProxy(BaseProxyManager):
     
     async def close(self):
         """Close the providers."""
-        await self.provider.close()
-        if self.fallback_provider is not None:
-            await self.fallback_provider.close()
+        for provider in [self.provider, *self.fallback_providers]:
+            await provider.close()

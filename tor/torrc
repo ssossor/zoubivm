@@ -1,0 +1,5 @@
+# Only reachable from the Compose network: the port is not published on the host.
+SocksPort 0.0.0.0:9050
+SocksPolicy accept 10.0.0.0/8,accept 172.16.0.0/12,accept 192.168.0.0/16,reject *
+DataDirectory /var/lib/tor
+Log notice stdout

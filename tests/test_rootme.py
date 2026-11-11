@@ -138,16 +138,17 @@ async def test_three_failed_proxies_give_up_and_wait(proxied_client, fake_rootme
     assert sleeps == [RootMeClient.PROXY_GIVE_UP_PAUSE]
 
 
-async def test_fallback_provider_when_main_has_no_proxy(fake_rootme, sleeps, provider):
-    empty = fake_provider([])
+async def test_fallback_providers_are_tried_in_order(fake_rootme, sleeps, provider):
+    empty, also_empty = fake_provider([]), fake_provider([])
+    unused = fake_provider([ProxyData("10.0.0.9", 1080, "socks5")])
     client = await RootMeClient.create(api_keys=["key1"], proxy_provider=empty,
-                                       fallback_proxy_provider=provider)
+                                       fallback_proxy_providers=[also_empty, provider, unused])
     fake_rootme.inject("/challenges/", 429)
 
     await client.get_chall_from_id("85")
     await client.close()
 
-    assert (empty.fetches, provider.fetches) == (1, 1)
+    assert [p.fetches for p in (empty, also_empty, provider, unused)] == [1, 1, 1, 0]
     assert current_address(client) == "10.0.0.1"
 
 
@@ -181,3 +182,11 @@ def test_describe_error_shows_hidden_cause():
         description = describe_error(err)
 
     assert description == "ConnectError('') <- ConnectionResetError(104, 'Connection reset by peer')"
+
+
+async def test_proxies_are_tested_against_rootme(rm_client):
+    assert rm_client.proxy_manager.validator.test_url == "https://api.www.root-me.org/"
+
+
+async def test_proxies_of_every_supported_protocol_are_asked(rm_client):
+    assert rm_client.proxy_manager.filters.protocol == "socks5,http,https"

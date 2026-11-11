@@ -98,7 +98,7 @@ class RootMeClient:
         api_keys = cls.load_api_keys_from_file(file_path)
         return await cls.create(api_keys, proxy_provider)
 
-    def __init__(self, api_keys: List[str], proxy_provider=None, fallback_proxy_provider=None):
+    def __init__(self, api_keys: List[str], proxy_provider=None, fallback_proxy_providers=None):
         """
         Initialize RootMeClient.
         
@@ -106,8 +106,8 @@ class RootMeClient:
             api_keys: List of RootMe API keys for rotation
             proxy_provider: Optional proxy provider implementation
                            If None, uses DefaultProxyProvider (no proxies)
-            fallback_proxy_provider: Optional provider used when proxy_provider
-                                     gives no working proxy
+            fallback_proxy_providers: Optional providers tried in order when
+                                      proxy_provider gives no working proxy
         """
         if not isinstance(api_keys, list) or len(api_keys) == 0:
             raise ValueError("api_keys must be a non-empty list of strings")
@@ -119,9 +119,10 @@ class RootMeClient:
         # Set up proxy manager
         self.proxy_manager = IndustrialProxy(
             countries=["FR", "DE", "NL", "GB", "BE", "CH", "LU", "ES", "IT", "PT"],
-            protocol="socks5",
+            protocol="socks5,http,https",
             proxy_provider=proxy_provider or DefaultProxyProvider(),
-            fallback_provider=fallback_proxy_provider
+            fallback_providers=fallback_proxy_providers,
+            test_url=f"{self.URL}/"
         )
         
         self.client = None
@@ -129,21 +130,21 @@ class RootMeClient:
         self.key_lock = asyncio.Lock()
 
     @classmethod
-    async def create(cls, api_keys: List[str], proxy_provider=None, fallback_proxy_provider=None):
+    async def create(cls, api_keys: List[str], proxy_provider=None, fallback_proxy_providers=None):
         """
         Create and initialize a RootMeClient instance.
         
         Args:
             api_keys: List of RootMe API keys
             proxy_provider: Optional proxy provider
-            fallback_proxy_provider: Optional fallback proxy provider
+            fallback_proxy_providers: Optional fallback proxy providers
             
         Returns:
             Initialized RootMeClient instance
             
         Starts without proxy: proxies are only fetched on the first rate limit.
         """
-        self = cls(api_keys, proxy_provider, fallback_proxy_provider)
+        self = cls(api_keys, proxy_provider, fallback_proxy_providers)
         await self._init_http_client()
         
         return self
